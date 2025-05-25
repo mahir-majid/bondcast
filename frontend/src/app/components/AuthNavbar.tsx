@@ -15,12 +15,6 @@ export default function AuthNavbar() {
 
       {/* Links shown when signed in */}
       <nav className="space-x-6 sm:space-x-10 text-xl sm:text-2xl font-semibold text-amber-800">
-        <Link
-          href="/friends"
-          className="hover:underline hover:text-amber-900 transition-colors"
-        >
-          Friends
-        </Link>
         
         <Link
           href="/daily-chat"

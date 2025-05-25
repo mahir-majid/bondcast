@@ -9,19 +9,20 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 
 import os
 import django
-from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-from convos.routing import websocket_urlpatterns  # import your app's routing.py
+from django.core.asgi import get_asgi_application
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
 django.setup()
 
+# Import these after django.setup()
+from convos.routing import websocket_urlpatterns as convos_websocket_urlpatterns
+from friends.routing import websocket_urlpatterns as friends_websocket_urlpatterns
+
+# Combine all websocket URL patterns
+websocket_urlpatterns = convos_websocket_urlpatterns + friends_websocket_urlpatterns
+
 application = ProtocolTypeRouter({
-    "http": get_asgi_application(),  # Handles regular HTTP requests
-    "websocket": AuthMiddlewareStack(  # Handles websocket connections with auth
-        URLRouter(
-            websocket_urlpatterns  # Your websocket routes from routing.py
-        )
-    ),
+    "http": get_asgi_application(),
+    "websocket": URLRouter(websocket_urlpatterns),
 })

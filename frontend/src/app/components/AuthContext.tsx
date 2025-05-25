@@ -38,13 +38,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
   // Read the Django backend URL from env (defaults to localhost if missing)
-  const baseURL =
-    process.env.NEXT_PUBLIC_URL
+  const baseURL = process.env.NEXT_PUBLIC_URL;
 
   // ------------ Helpers ------------
 
   /**
+   * Refresh the access token using the refresh token
+   */
+  const refreshAccessToken = async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (!refreshToken) return null;
+
+    try {
+      const res = await fetch(`${baseURL}/api/users/refresh-jwt/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh: refreshToken }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to refresh token");
+      }
+
+      const data = await res.json();
+      localStorage.setItem("accessToken", data.access);
+      if (data.refresh) {  // If a new refresh token is provided
+        localStorage.setItem("refreshToken", data.refresh);
+      }
+      return data.access;
+    } catch (error) {
+      console.error("Error refreshing token:", error);
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      return null;
+    }
+  };
+
+  /**
    * Validate existing access token (if any) with Django and set the user.
+   * If token is expired, try to refresh it.
    */
   const fetchUser = async () => {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -63,19 +96,56 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        setUser(null);
-        return;
-      }
+        // Token might be expired, try to refresh it
+        const newToken = await refreshAccessToken();
+        if (!newToken) {
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          setUser(null);
+          setLoading(false);
+          return;
+        }
 
-      const data = await res.json();
-      setUser(data.user);
+        // Retry the request with the new token
+        const retryRes = await fetch(`${baseURL}/api/users/validate-jwt/`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${newToken}`,
+          },
+        });
+
+        if (!retryRes.ok) {
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        const data = await retryRes.json();
+        setUser(data);
+      } else {
+        const data = await res.json();
+        setUser(data);
+      }
     } catch (error) {
       setUser(null);
     } finally {
       setLoading(false);
     }
   };
+
+  // Set up an interval to refresh the token before it expires
+  useEffect(() => {
+    const refreshInterval = setInterval(async () => {
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        await refreshAccessToken();
+      }
+    }, 4 * 60 * 1000); // Refresh every 4 minutes
+
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   useEffect(() => {
     fetchUser();

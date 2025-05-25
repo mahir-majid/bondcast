@@ -1,8 +1,10 @@
+# users/urls.py
 from django.urls import path
-from .views import FriendListView, AddFriendView, RemoveFriendView
+from .views import SendFriendRequestView, AcceptFriendRequestView, DeclineFriendRequestView
 
 urlpatterns = [
-    path('list/', FriendListView.as_view(), name='friend-list'),
-    path('add/', AddFriendView.as_view(), name='friend-add'),
-    path('remove/', RemoveFriendView.as_view(), name='friend-remove'),
+    path('add/', SendFriendRequestView.as_view(), name='add-friend'),
+    path('accept/', AcceptFriendRequestView.as_view(), name='accept-friend'),
+    path('decline/', DeclineFriendRequestView.as_view(), name='decline-friend'),
 ]
+

@@ -128,7 +128,7 @@ export default function Join() {
             <input type="password" name="password" placeholder="Password" value={form.password} onChange={handleChange} required minLength={6} className={`p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white ${errors.password ? "ring-red-500 ring-2" : ""}`} />
             {errors.password && <p className="text-red-300 text-sm text-left">{errors.password}</p>}
 
-            <button type="submit" disabled={isLoading} className="bg-white text-blue-700 py-3 rounded font-semibold text-lg hover:bg-blue-100 transition disabled:opacity-60">
+            <button type="submit" disabled={isLoading} className="bg-white text-blue-700 cursor-pointer py-3 rounded font-semibold text-lg hover:bg-blue-100 transition disabled:opacity-60">
               {isLoading ? "Checking..." : "Create Account"}
             </button>
           </form>

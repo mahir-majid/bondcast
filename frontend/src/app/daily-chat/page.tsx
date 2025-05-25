@@ -10,7 +10,7 @@ import AuthNavbar from "../components/AuthNavbar";
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-
+  const websocketURL = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
   const [isTalking, setIsTalking] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
 
@@ -60,7 +60,7 @@ export default function Dashboard() {
       silence.gain.value = 0;
 
       /* 6️⃣ WebSocket to Django Channels */
-      const socket = new WebSocket("ws://127.0.0.1:8000/ws/speech/");
+      const socket = new WebSocket(`${websocketURL}/ws/speech/`);
       socket.binaryType = "arraybuffer";
 
       /* send each PCM buffer */
