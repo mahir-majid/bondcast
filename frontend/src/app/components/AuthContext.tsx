@@ -68,7 +68,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       return data.access;
     } catch (error) {
-      console.error("Error refreshing token:", error);
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       return null;

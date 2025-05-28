@@ -1,0 +1,5 @@
+vosk-model-small-en-us-0.15/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd

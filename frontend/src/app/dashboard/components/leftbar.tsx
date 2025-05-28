@@ -321,7 +321,7 @@ export default function LeftBar({ user }: LeftBarProps) {
       {newFriendMessage && (
         <div className="relative self-end -mt-2 mr-1">
           <div
-            className={`z-3 absolute right-20 bottom-full mb-[13.5rem] max-w-[1200px] w-auto rounded-lg px-4 py-2 text-sm shadow-lg text-white ${
+            className={`z-3 absolute right-20 bottom-full mb-[7.5rem] max-w-[1200px] w-auto rounded-lg px-4 py-2 text-sm shadow-lg text-white ${
               newFriendSuccess ? "bg-green-600" : "bg-red-600"
             }`}
           >
