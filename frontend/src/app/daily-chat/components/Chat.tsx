@@ -20,6 +20,7 @@ export default function Chat({ websocketURL }: ChatProps) {
   const stopRef = useRef<(() => void) | null>(null);
   const transcriptionContextRef = useRef<AudioContext | null>(null);
   const playbackContextRef = useRef<AudioContext | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
 
   /** start / stop mic + websocket */
   const TalkToAI = async () => {
@@ -40,6 +41,12 @@ export default function Chat({ websocketURL }: ChatProps) {
       // Create audio context for playback (16kHz for ElevenLabs PCM)
       const playbackContext = new AudioContext({ sampleRate: 16000 });
       playbackContextRef.current = playbackContext;
+      
+      // Load and initialize the audio worklet (used for ElevenLabs TTS)
+      await playbackContext.audioWorklet.addModule('/audio-processor.js');
+      const workletNode = new AudioWorkletNode(playbackContext, 'pcm-processor');
+      workletNodeRef.current = workletNode;
+      workletNode.connect(playbackContext.destination);
       
       // Setup audio processor
       const processor = await setupAudioProcessor(transcriptionContext);
@@ -68,6 +75,9 @@ export default function Chat({ websocketURL }: ChatProps) {
         console.log("Stopping audio + WS");
         source.disconnect();
         processor.disconnect();
+        if (workletNodeRef.current) {
+          workletNodeRef.current.disconnect();
+        }
         stream.getTracks().forEach(track => track.stop());
         if (transcriptionContext.state !== "closed") transcriptionContext.close();
         if (playbackContext.state !== "closed") playbackContext.close();
@@ -91,31 +101,13 @@ export default function Chat({ websocketURL }: ChatProps) {
 
             // Log chunk details
             console.log(`Received audio chunk: size=${e.data.byteLength} bytes`);
-            const pcmData = new Int16Array(e.data);
-            console.log(`First few PCM values: ${Array.from(pcmData.slice(0, 10))}`);
-
-            // Handle binary audio data - play immediately using playback context
-            const playbackContext = playbackContextRef.current;
-            if (playbackContext) {
-              // Convert raw PCM to Float32Array
-              const floatData = new Float32Array(pcmData.length);
-              for (let i = 0; i < pcmData.length; i++) {
-                floatData[i] = pcmData[i] / 32768; // normalize to [-1, 1]
-              }
-
-              // Create and fill audio buffer
-              const audioBuffer = playbackContext.createBuffer(1, floatData.length, 16000);
-              audioBuffer.getChannelData(0).set(floatData);
-
-              // Log audio buffer details
-              console.log(`Created audio buffer: length=${audioBuffer.length}, sampleRate=${audioBuffer.sampleRate}`);
-
-              // Play the audio
-              const source = playbackContext.createBufferSource();
-              source.buffer = audioBuffer;
-              source.connect(playbackContext.destination);
-              source.start();
-              console.log('Started playing audio chunk');
+            
+            // Send the PCM data to the worklet
+            if (workletNodeRef.current) {
+              workletNodeRef.current.port.postMessage({
+                type: 'pcm',
+                buffer: e.data
+              }, [e.data]);
             }
           } else {
             // Handle JSON messages

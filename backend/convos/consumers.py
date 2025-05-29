@@ -182,31 +182,27 @@ class SpeechConsumer(AsyncWebsocketConsumer):
 
         # Stream response to ElevenLabs
         try:
-            # Get audio stream and play it directly
+            # Get audio stream and send to frontend
             audio_stream = elevenlabs.text_to_speech.stream(
-                text=llm_response,
+                text="I'm doing great.",
                 voice_id="JBFqnCBsd6RMkjVDRZzb",
                 model_id="eleven_flash_v2",
                 output_format="pcm_16000"
             )
             
-            # Initialize PyAudio
-            p = pyaudio.PyAudio()
-            stream = p.open(format=pyaudio.paInt16,
-                          channels=1,
-                          rate=16000,
-                          output=True)
-            
-            # Play the audio stream
+            # Stream audio chunks to frontend
+            chunk_count = 0
+            total_bytes = 0
             for chunk in audio_stream:
                 if isinstance(chunk, bytes):
                     self.last_user_audio_time = time.time()
-                    stream.write(chunk)
+                    chunk_size = len(chunk)
+                    total_bytes += chunk_size
+                    chunk_count += 1
+                    logger.info(f"Chunk {chunk_count}: size={chunk_size} bytes")
+                    await self.send(bytes_data=chunk)
             
-            # Clean up
-            stream.stop_stream()
-            stream.close()
-            p.terminate()
+            logger.info(f"Total chunks: {chunk_count}, Total bytes: {total_bytes}")
 
         except Exception as e:
             logger.error(f"Error in ElevenLabs streaming: {str(e)}")
