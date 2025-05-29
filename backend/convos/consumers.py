@@ -4,6 +4,19 @@ import time
 from vosk import Model, KaldiRecognizer
 from django.contrib.auth import get_user_model
 from channels.db import database_sync_to_async
+from groq import Groq
+from dotenv import load_dotenv
+import os
+from pathlib import Path
+from elevenlabs import stream
+from elevenlabs.client import ElevenLabs
+import pyaudio
+import wave
+import io
+
+# Load environment variables
+env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+load_dotenv(env_path)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -15,6 +28,12 @@ STREAM_TIMEOUT = 10  # seconds of silence before ending stream
 # Initialize Vosk model
 model_path = "convos/vosk-model-small-en-us-0.15"  # Path relative to backend directory
 model = Model(model_path)
+
+# Initialize ElevenLabs client
+api_key = os.getenv('ELEVENLABS_API_KEY')
+if not api_key:
+    raise ValueError("ELEVENLABS_API_KEY environment variable not set")
+elevenlabs = ElevenLabs(api_key=api_key)
 
 User = get_user_model()
 
@@ -82,7 +101,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Check for stream timeout
             if time_since_last_user_audio >= STREAM_TIMEOUT:
                 logger.info("Stream timeout reached - ending session")
-                await self._process_with_llm("Nice chatting with you. Talk to you later.")
+                # await self._process_with_llm("User had to go. Say nice chatting with you. Talk to you later.")
                 # Wait a bit to ensure LLM processing and response are sent
                 await asyncio.sleep(1)
                 await self.close(code=1000)  # Normal closure
@@ -127,25 +146,78 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         # Accumulate text for processing after silence
         self.current_text += text
         
-        # Send transcription to frontend for display
+        # Send transcription to backend logs
         print(f"transcription: {text}")
 
-
     async def _process_with_llm(self, llm_input: str) -> str:
-        # TODO: Implement actual LLM processing here
-        # For now, return a simple response
+        self.last_user_audio_time = time.time()
         print(f"Entered LLM processing service")
         print(f"LLM Input: {llm_input}")
 
-        # Update with Groq + llm_input
-        response = "This is an AI Message"
+        # Initialize Groq client with API key from .env
+        client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+        
+        # Stream the response
+        groq_stream = client.chat.completions.create(
+            model="llama-3.1-8b-instant",  
+            messages=[
+                {"role": "system", "content": "You are talking directly to the user. Limit your response to only 2 to 3 sentences max. Be enthusiastic guiding the conversation with engaging questions and respond to their most recent query."},
+                {"role": "user", "content": llm_input}
+            ],
+            stream=True,
+            temperature=0.7,
+            max_tokens=1024
+        )
 
-
-        self.overall_text += "AI: " + f"\"{response}\" " 
-        print(f"LLM response: {response}")
+        # Collect the full response while streaming
+        llm_response = ""
+        for chunk in groq_stream:
+            if chunk.choices[0].delta.content is not None:
+                content = chunk.choices[0].delta.content
+                llm_response += content
+                
+        self.last_user_audio_time = time.time()
+        self.overall_text += "AI: " + f"\"{llm_response}\" "
+        print(f"LLM response: {llm_response}")
 
         # Stream response to ElevenLabs
+        try:
+            # Get audio stream and play it directly
+            audio_stream = elevenlabs.text_to_speech.stream(
+                text=llm_response,
+                voice_id="JBFqnCBsd6RMkjVDRZzb",
+                model_id="eleven_flash_v2",
+                output_format="pcm_16000"
+            )
+            
+            # Initialize PyAudio
+            p = pyaudio.PyAudio()
+            stream = p.open(format=pyaudio.paInt16,
+                          channels=1,
+                          rate=16000,
+                          output=True)
+            
+            # Play the audio stream
+            for chunk in audio_stream:
+                if isinstance(chunk, bytes):
+                    self.last_user_audio_time = time.time()
+                    stream.write(chunk)
+            
+            # Clean up
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
 
+        except Exception as e:
+            logger.error(f"Error in ElevenLabs streaming: {str(e)}")
+            logger.error(f"Error details: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Send error message to frontend
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "content": f"Failed to generate speech: {str(e)}"
+            }))
 
     async def disconnect(self, code):
         await self._flush()

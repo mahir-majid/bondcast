@@ -9,16 +9,17 @@ interface ChatProps {
 }
 
 interface Message {
-  type: 'transcription' | 'response';
-  text: string;
+  type: 'transcription' | 'llm_response' | 'error';
+  content: string;
   timestamp: number;
 }
 
 export default function Chat({ websocketURL }: ChatProps) {
   const { user } = useAuth();
   const [isTalking, setIsTalking] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
   const stopRef = useRef<(() => void) | null>(null);
+  const transcriptionContextRef = useRef<AudioContext | null>(null);
+  const playbackContextRef = useRef<AudioContext | null>(null);
 
   /** start / stop mic + websocket */
   const TalkToAI = async () => {
@@ -31,12 +32,17 @@ export default function Chat({ websocketURL }: ChatProps) {
       // Get microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // Create audio context and source
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      const source = audioContext.createMediaStreamSource(stream);
+      // Create audio context for transcription (16kHz for Vosk)
+      const transcriptionContext = new AudioContext({ sampleRate: 16000 });
+      transcriptionContextRef.current = transcriptionContext;
+      const source = transcriptionContext.createMediaStreamSource(stream);
+      
+      // Create audio context for playback (16kHz for ElevenLabs PCM)
+      const playbackContext = new AudioContext({ sampleRate: 16000 });
+      playbackContextRef.current = playbackContext;
       
       // Setup audio processor
-      const processor = await setupAudioProcessor(audioContext);
+      const processor = await setupAudioProcessor(transcriptionContext);
       
       // WebSocket connection with username
       const socket = new WebSocket(`${websocketURL}/ws/speech/${user.username}/`);
@@ -47,7 +53,7 @@ export default function Chat({ websocketURL }: ChatProps) {
         console.log("WebSocket connected");
         setIsTalking(true);
         source.connect(processor);
-        processor.connect(audioContext.destination);
+        processor.connect(transcriptionContext.destination);
       };
 
       // Handle audio data from processor and send to backend for transcription
@@ -63,7 +69,8 @@ export default function Chat({ websocketURL }: ChatProps) {
         source.disconnect();
         processor.disconnect();
         stream.getTracks().forEach(track => track.stop());
-        if (audioContext.state !== "closed") audioContext.close();
+        if (transcriptionContext.state !== "closed") transcriptionContext.close();
+        if (playbackContext.state !== "closed") playbackContext.close();
         if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
           socket.close();
         }
@@ -72,14 +79,52 @@ export default function Chat({ websocketURL }: ChatProps) {
       stopRef.current = stop;
 
       // Websocket receiving information from the backend
-      socket.onmessage = (e) => {
+      socket.onmessage = async (e) => {
         try {
-          // Handle JSON messages (transcription and response)
-          const data = JSON.parse(e.data);
-          if (data.transcription) {
-            console.log(`Transcription from backend: ${data.transcription}`)
-          } else if (data.response) {
-            console.log(`LLM Response from backend: ${data.response}`)
+          // Handles ElevenLabs streaming
+          if (e.data instanceof ArrayBuffer) {
+            // Skip partial chunks
+            if (e.data.byteLength % 2 !== 0) {
+              console.log("Skipping partial audio chunk");
+              return;
+            }
+
+            // Log chunk details
+            console.log(`Received audio chunk: size=${e.data.byteLength} bytes`);
+            const pcmData = new Int16Array(e.data);
+            console.log(`First few PCM values: ${Array.from(pcmData.slice(0, 10))}`);
+
+            // Handle binary audio data - play immediately using playback context
+            const playbackContext = playbackContextRef.current;
+            if (playbackContext) {
+              // Convert raw PCM to Float32Array
+              const floatData = new Float32Array(pcmData.length);
+              for (let i = 0; i < pcmData.length; i++) {
+                floatData[i] = pcmData[i] / 32768; // normalize to [-1, 1]
+              }
+
+              // Create and fill audio buffer
+              const audioBuffer = playbackContext.createBuffer(1, floatData.length, 16000);
+              audioBuffer.getChannelData(0).set(floatData);
+
+              // Log audio buffer details
+              console.log(`Created audio buffer: length=${audioBuffer.length}, sampleRate=${audioBuffer.sampleRate}`);
+
+              // Play the audio
+              const source = playbackContext.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(playbackContext.destination);
+              source.start();
+              console.log('Started playing audio chunk');
+            }
+          } else {
+            // Handle JSON messages
+            const data = JSON.parse(e.data);
+            if (data.type === 'llm_response') {
+              
+            } else if (data.type === 'error') {
+              console.error('Error from backend:', data.content);
+            }
           }
         } catch (error) {
           console.error("Error processing message:", error);
