@@ -2,10 +2,10 @@
 
 import { useState, useRef } from "react";
 import { setupAudioProcessor } from "./audio";
-import { useAuth } from "../../components/AuthContext";
+import { useAuth } from "./AuthContext";
 
 interface ChatProps {
-  websocketURL: string;
+  llmMode: string;
 }
 
 interface Message {
@@ -14,7 +14,7 @@ interface Message {
   timestamp: number;
 }
 
-export default function Chat({ websocketURL }: ChatProps) {
+export default function Chat({ llmMode }: ChatProps) {
   const { user } = useAuth();
   const [isTalking, setIsTalking] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
@@ -52,7 +52,7 @@ export default function Chat({ websocketURL }: ChatProps) {
       const processor = await setupAudioProcessor(transcriptionContext);
       
       // WebSocket connection with username
-      const socket = new WebSocket(`${websocketURL}/ws/speech/${user.username}/`);
+      const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}/ws/speech/${user.username}/${llmMode}/`);
       socket.binaryType = "arraybuffer";
 
       // Handles initial connection to the websocket
@@ -137,13 +137,17 @@ export default function Chat({ websocketURL }: ChatProps) {
   const handleClick = () => (isTalking && stopRef.current ? stopRef.current() : TalkToAI());
 
   return (
+
     <div className="flex flex-col items-center gap-6 w-full max-w-2xl">
       <button
         onClick={handleClick}
         className="px-6 py-3 cursor-pointer bg-gradient-to-r from-blue-500 to-blue-700 rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-800 active:scale-95 active:shadow-inner transition"
       >
-        {isTalking ? "End Daily Chat" : "Start Daily Chat"}
+        {isTalking ? "End Call" : "Call Bondi"}
       </button>
     </div>
+
+
+
   );
 } 

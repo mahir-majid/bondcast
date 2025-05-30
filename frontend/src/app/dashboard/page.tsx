@@ -4,10 +4,12 @@ import { useAuth } from "../components/AuthContext";
 import { useRouter } from "next/navigation";
 import AuthNavbar from "../components/AuthNavbar";
 import LeftBar from "./components/leftbar";
+import Chat from "../components/Chat";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
+
 
   if (loading) {
     return <div>Loading...</div>;
@@ -18,7 +20,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-teal-200 via-blue-400 to-indigo-700 text-white font-sans">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-teal-200 via-blue-400 to-indigo-700 text-white font-sans">
       <div className="z-1">
         <AuthNavbar />
       </div>
@@ -34,10 +36,10 @@ export default function Dashboard() {
           {/* Add any other dashboard content here */}
         </section>
       </main>
+      <div className="absolute top-25 right-8">
+        <Chat llmMode={"user_called"} />
+      </div>
 
-      <footer className="text-center py-6 text-sm text-white/70 bg-indigo-950 mt-auto">
-        © {new Date().getFullYear()} Bondiver — Dive Deeper.
-      </footer>
     </div>
   );
 }

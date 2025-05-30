@@ -26,18 +26,6 @@ export default function AuthNavbar() {
 
       {/* Links shown when signed in */}
       <nav className="flex items-center space-x-6 sm:space-x-10 text-xl sm:text-2xl font-semibold text-amber-800">
-        <Link
-          href="/daily-chat"
-          className="hover:underline hover:text-amber-900 transition-colors"
-        >
-          Daily Chat
-        </Link>
-        <Link
-          href="/dashboard"
-          className="hover:underline hover:text-amber-900 transition-colors"
-        >
-          Dashboard
-        </Link>
         
         {/* Profile Icon and Card */}
         <div className="relative">

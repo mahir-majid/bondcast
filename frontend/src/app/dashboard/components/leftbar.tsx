@@ -193,7 +193,7 @@ export default function LeftBar({ user }: LeftBarProps) {
   };
 
   return (
-    <aside className="w-96 bg-gradient-to-b from-purple-900 via-purple-800 to-purple-700 bg-opacity-80 rounded-xl p-6 flex flex-col gap-6 min-h-[calc(100vh-72px)] relative text-white shadow-lg">
+    <aside className="w-96 bg-gradient-to-b from-purple-900 via-purple-800 to-purple-700 bg-opacity-80 rounded-xl p-6 flex flex-col gap-6 text-white shadow-lg">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold mb-2 cursor-pointer text-blue-300">
           {leftDashBarState === "listFriends" ? "Friends" : "Friend Requests"}
@@ -250,7 +250,7 @@ export default function LeftBar({ user }: LeftBarProps) {
           <p className="text-s text-white mt-7 flex items-start gap-1">
             <span className="text-black">•</span>
             <span>
-              Enter either username <span className="italic">OR</span> first and last name
+              Search by username <span className="italic">OR</span> full name
             </span>
           </p>
         </div>
