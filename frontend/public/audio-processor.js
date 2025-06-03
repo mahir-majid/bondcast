@@ -2,6 +2,8 @@ class PCMProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
         this.buffer = new Float32Array(0);
+        this.playing = false;
+        this.lastAudioTime = currentTime;
         this.port.onmessage = (event) => {
             if (event.data.type === 'pcm') {
                 // Convert Int16Array to Float32Array
@@ -25,6 +27,10 @@ class PCMProcessor extends AudioWorkletProcessor {
         const channel = output[0];
 
         if (this.buffer.length === 0) {
+            if (this.playing) {
+                this.playing = false;
+                this.port.postMessage({ type: "audio_done" });
+            }
             return true;
         }
 
@@ -37,6 +43,11 @@ class PCMProcessor extends AudioWorkletProcessor {
             this.buffer = this.buffer.subarray(samplesToCopy);
         } else {
             this.buffer = new Float32Array(0);
+        }
+
+        if (!this.playing) {
+            this.playing = true;
+            this.port.postMessage({ type: "audio_started" });
         }
 
         return true;

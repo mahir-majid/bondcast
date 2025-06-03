@@ -48,6 +48,14 @@ export default function Chat({ llmMode }: ChatProps) {
       workletNodeRef.current = workletNode;
       workletNode.connect(playbackContext.destination);
       
+      // Handle audio playback state events
+      workletNode.port.onmessage = (event) => {
+        const { type } = event.data;
+        if ((type === "audio_started" || type === "audio_done") && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type }));
+        }
+      };
+      
       // Setup audio processor
       const processor = await setupAudioProcessor(transcriptionContext);
       
