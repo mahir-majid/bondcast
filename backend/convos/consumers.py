@@ -26,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CHUNK_SAMPLES = 16000 // 4  
-SILENCE_THRESHOLD = 0.20  # seconds of silence before processing
+SILENCE_THRESHOLD = 0.5  # seconds of silence before processing
 STREAM_TIMEOUT = 5  # seconds of silence before ending stream
 FIRST_TIMEOUT = 5
 SECOND_TIMEOUT = 5
@@ -134,7 +134,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             user_audio_delay = current_time - self.last_baseline_audio_time
  
             # Normal silence threshold check
-            if self.llmMode == "user_called" and user_audio_delay >= SILENCE_THRESHOLD and len(self.current_text) > 50:
+            if self.llmMode == "user_called" and user_audio_delay >= SILENCE_THRESHOLD and self.current_text:
                 self.transcribing_text = False
                 # logger.info(f"Middleware silence threshold reached. Processing text: {self.current_text}")
                 llm_middleware_input = (f"User just said \"{self.current_text}\" with {int(user_audio_delay * 1000)} ms of silence. "
