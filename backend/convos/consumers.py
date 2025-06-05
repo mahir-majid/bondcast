@@ -147,7 +147,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 logger.info("first timeout request made")
                 first_timeout_response = "Can you still hear me?"
                 self.passed_first_timeout = True
-                await self._process_tts_llm(first_timeout_response)
+                await self._stream_tts(first_timeout_response)
                 # Wait for streaming to complete before continuing
                 while self.streaming_text:
                     await asyncio.sleep(0.1)
