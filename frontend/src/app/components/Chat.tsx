@@ -51,8 +51,14 @@ export default function Chat({ llmMode }: ChatProps) {
       // Handle audio playback state events
       workletNode.port.onmessage = (event) => {
         const { type } = event.data;
-        if ((type === "audio_started" || type === "audio_done") && socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ type }));
+        if (type === "audio_started" || type === "audio_done") {
+          console.log(`Audio state: ${type}`);
+          if (socket.readyState === WebSocket.OPEN) {
+            // Ensure the message is sent as a string
+            const message = JSON.stringify({ type });
+            console.log(`Sending to backend: ${message}`);
+            socket.send(message);
+          }
         }
       };
       
@@ -81,6 +87,10 @@ export default function Chat({ llmMode }: ChatProps) {
       // Cleanup helper
       const stop = () => {
         console.log("Stopping audio + WS");
+        // Ensure we send any pending audio state messages before cleanup
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "audio_cleanup" }));
+        }
         source.disconnect();
         processor.disconnect();
         if (workletNodeRef.current) {
@@ -120,6 +130,7 @@ export default function Chat({ llmMode }: ChatProps) {
           } else {
             // Handle JSON messages
             const data = JSON.parse(e.data);
+            console.log(`Received from backend: ${JSON.stringify(data)}`);
             if (data.type === 'llm_response') {
               
             } else if (data.type === 'error') {

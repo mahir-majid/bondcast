@@ -3,7 +3,6 @@ class PCMProcessor extends AudioWorkletProcessor {
         super();
         this.buffer = new Float32Array(0);
         this.playing = false;
-        this.lastAudioTime = currentTime;
         this.port.onmessage = (event) => {
             if (event.data.type === 'pcm') {
                 // Convert Int16Array to Float32Array
@@ -18,6 +17,19 @@ class PCMProcessor extends AudioWorkletProcessor {
                 newBuffer.set(this.buffer);
                 newBuffer.set(floatData, this.buffer.length);
                 this.buffer = newBuffer;
+
+                // If we just received data and weren't playing, signal start
+                if (!this.playing && this.buffer.length > 0) {
+                    this.playing = true;
+                    this.port.postMessage({ type: "audio_started" });
+                }
+            } else if (event.data.type === 'stop_audio') {
+                // Clear the buffer and stop playing
+                this.buffer = new Float32Array(0);
+                if (this.playing) {
+                    this.playing = false;
+                    this.port.postMessage({ type: "audio_done" });
+                }
             }
         };
     }
@@ -43,11 +55,10 @@ class PCMProcessor extends AudioWorkletProcessor {
             this.buffer = this.buffer.subarray(samplesToCopy);
         } else {
             this.buffer = new Float32Array(0);
-        }
-
-        if (!this.playing) {
-            this.playing = true;
-            this.port.postMessage({ type: "audio_started" });
+            if (this.playing) {
+                this.playing = false;
+                this.port.postMessage({ type: "audio_done" });
+            }
         }
 
         return true;
