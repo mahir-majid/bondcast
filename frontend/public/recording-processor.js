@@ -1,7 +1,5 @@
-// Configuring WorkLet Node ElevenLabs TTS Speaker Functionality in Chat.tsx
-// so the user can hear Bondi speaking via ElevenLabs
-
-class PCMProcessor extends AudioWorkletProcessor {
+// Recording-specific audio processor that handles sample rate conversion
+class RecordingProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
         this.buffer = new Float32Array(0);
@@ -15,10 +13,13 @@ class PCMProcessor extends AudioWorkletProcessor {
                     floatData[i] = pcmData[i] / 32768;
                 }
                 
+                // Resample from 16kHz to 44.1kHz (ratio = 2.75625)
+                const resampledData = this.resample(floatData, 16000, 44100);
+                
                 // Append to our buffer
-                const newBuffer = new Float32Array(this.buffer.length + floatData.length);
+                const newBuffer = new Float32Array(this.buffer.length + resampledData.length);
                 newBuffer.set(this.buffer);
-                newBuffer.set(floatData, this.buffer.length);
+                newBuffer.set(resampledData, this.buffer.length);
                 this.buffer = newBuffer;
 
                 // If we just received data and weren't playing, signal start
@@ -35,6 +36,28 @@ class PCMProcessor extends AudioWorkletProcessor {
                 }
             }
         };
+    }
+
+    // Linear interpolation resampling
+    resample(input, fromRate, toRate) {
+        const ratio = toRate / fromRate;
+        const newLength = Math.round(input.length * ratio);
+        const result = new Float32Array(newLength);
+        
+        for (let i = 0; i < newLength; i++) {
+            const position = i / ratio;
+            const index = Math.floor(position);
+            const fraction = position - index;
+            
+            // Get the two samples we need to interpolate between
+            const sample1 = input[index] || 0;
+            const sample2 = input[index + 1] || 0;
+            
+            // Linear interpolation
+            result[i] = sample1 + fraction * (sample2 - sample1);
+        }
+        
+        return result;
     }
 
     process(inputs, outputs) {
@@ -68,4 +91,4 @@ class PCMProcessor extends AudioWorkletProcessor {
     }
 }
 
-registerProcessor('pcm-processor', PCMProcessor); 
+registerProcessor('recording-processor', RecordingProcessor); 
