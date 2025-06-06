@@ -1,3 +1,5 @@
+// Configuring WorkLet Node ElevenLabs TTS Speaker Functionality in Chat.tsx
+
 class PCMProcessor extends AudioWorkletProcessor {
     constructor() {
         super();

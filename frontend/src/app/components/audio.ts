@@ -1,3 +1,5 @@
+// Support functionality of Vosk STT Transcription via transcriptionContext in Chat.tsx
+
 export const processorCode = `
   class PCMProcessor extends AudioWorkletProcessor {
     process(inputs) {

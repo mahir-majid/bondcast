@@ -20,7 +20,7 @@ export default function Chat({ llmMode }: ChatProps) {
   const stopRef = useRef<(() => void) | null>(null);
   const transcriptionContextRef = useRef<AudioContext | null>(null);
   const playbackContextRef = useRef<AudioContext | null>(null);
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const workletNodeTTSRef = useRef<AudioWorkletNode | null>(null);
 
   /** start / stop mic + websocket */
   const TalkToAI = async () => {
@@ -31,12 +31,12 @@ export default function Chat({ llmMode }: ChatProps) {
       }
 
       // Get microphone permission
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       // Create audio context for transcription (16kHz for Vosk)
       const transcriptionContext = new AudioContext({ sampleRate: 16000 });
       transcriptionContextRef.current = transcriptionContext;
-      const source = transcriptionContext.createMediaStreamSource(stream);
+      const transcriptionSource = transcriptionContext.createMediaStreamSource(microphoneStream);
       
       // Create audio context for playback (16kHz for ElevenLabs PCM)
       const playbackContext = new AudioContext({ sampleRate: 16000 });
@@ -44,12 +44,12 @@ export default function Chat({ llmMode }: ChatProps) {
       
       // Load and initialize the audio worklet (used for ElevenLabs TTS)
       await playbackContext.audioWorklet.addModule('/audio-processor.js');
-      const workletNode = new AudioWorkletNode(playbackContext, 'pcm-processor');
-      workletNodeRef.current = workletNode;
-      workletNode.connect(playbackContext.destination);
+      const workletNodeTTS = new AudioWorkletNode(playbackContext, 'pcm-processor');
+      workletNodeTTSRef.current = workletNodeTTS;
+      workletNodeTTS.connect(playbackContext.destination);
       
       // Handle audio playback state events
-      workletNode.port.onmessage = (event) => {
+      workletNodeTTS.port.onmessage = (event) => {
         const { type } = event.data;
         if (type === "audio_started" || type === "audio_done") {
           console.log(`Audio state: ${type}`);
@@ -62,8 +62,8 @@ export default function Chat({ llmMode }: ChatProps) {
         }
       };
       
-      // Setup audio processor
-      const processor = await setupAudioProcessor(transcriptionContext);
+      // Setup audio processor for transcription
+      const transcriptionProcessor = await setupAudioProcessor(transcriptionContext);
       
       // WebSocket connection with username
       const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}/ws/speech/${user.username}/${llmMode}/`);
@@ -73,12 +73,12 @@ export default function Chat({ llmMode }: ChatProps) {
       socket.onopen = () => {
         console.log("WebSocket connected");
         setIsTalking(true);
-        source.connect(processor);
-        processor.connect(transcriptionContext.destination);
+        transcriptionSource.connect(transcriptionProcessor);
+        transcriptionProcessor.connect(transcriptionContext.destination);
       };
 
       // Handle audio data from processor and send to backend for transcription
-      processor.port.onmessage = (e) => {
+      transcriptionProcessor.port.onmessage = (e) => {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(e.data);
         }
@@ -91,12 +91,12 @@ export default function Chat({ llmMode }: ChatProps) {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ type: "audio_cleanup" }));
         }
-        source.disconnect();
-        processor.disconnect();
-        if (workletNodeRef.current) {
-          workletNodeRef.current.disconnect();
+        transcriptionSource.disconnect();
+        transcriptionProcessor.disconnect();
+        if (workletNodeTTSRef.current) {
+          workletNodeTTSRef.current.disconnect();
         }
-        stream.getTracks().forEach(track => track.stop());
+        microphoneStream.getTracks().forEach(track => track.stop());
         if (transcriptionContext.state !== "closed") transcriptionContext.close();
         if (playbackContext.state !== "closed") playbackContext.close();
         if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
@@ -121,8 +121,8 @@ export default function Chat({ llmMode }: ChatProps) {
             console.log(`Received audio chunk: size=${e.data.byteLength} bytes`);
             
             // Send the PCM data to the worklet
-            if (workletNodeRef.current) {
-              workletNodeRef.current.port.postMessage({
+            if (workletNodeTTSRef.current) {
+              workletNodeTTSRef.current.port.postMessage({
                 type: 'pcm',
                 buffer: e.data
               }, [e.data]);
