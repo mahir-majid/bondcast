@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { HiMail, HiArrowLeft } from "react-icons/hi";
+import Chat from "../../components/Chat";
 
 interface Friend {
   id: number;
@@ -22,7 +23,7 @@ interface FriendRequest {
   created_at: string;
 }
 
-type LeftDashBarState = "listFriends" | "listFriendRequests";
+type LeftDashBarState = "listFriends" | "listFriendRequests" | "recording";
 
 interface LeftBarProps {
   user: {
@@ -40,6 +41,8 @@ export default function LeftBar({ user }: LeftBarProps) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [leftDashBarState, setLeftDashBarState] = useState<LeftDashBarState>("listFriends");
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<number[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
   const connectToFriendRequests = () => {
@@ -192,45 +195,89 @@ export default function LeftBar({ user }: LeftBarProps) {
     }
   };
 
+  const handleRecordingComplete = (url: string) => {
+    setRecordingUrl(url);
+    setLeftDashBarState("recording");
+  };
+
+  const handleSendRecording = async () => {
+    // TODO: Implement sending recording
+    console.log("Sending recording:", recordingUrl);
+  };
+
+  const handleCancelRecording = () => {
+    setRecordingUrl(null);
+    setLeftDashBarState("listFriends");
+  };
+
   return (
     <aside className="w-96 bg-gradient-to-b from-purple-900 via-purple-800 to-purple-700 bg-opacity-80 rounded-xl p-6 flex flex-col gap-6 text-white shadow-lg">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold mb-2 cursor-pointer text-blue-300">
-          {leftDashBarState === "listFriends" ? "Friends" : "Friend Requests"}
+          {leftDashBarState === "listFriends" ? "Friends" : 
+           leftDashBarState === "listFriendRequests" ? "Friend Requests" : 
+           "Recording Studio"}
         </h2>
-        <div className="relative">
-          <button
-            aria-label={leftDashBarState === "listFriends" ? "View friend requests" : "Back to friends"}
-            className="text-indigo-300 hover:text-white transition"
-            onClick={() => {
-              setLeftDashBarState(prev => prev === "listFriends" ? "listFriendRequests" : "listFriends");
-              setNewFriendMessage("");
-            }}
-          >
-            {leftDashBarState === "listFriends" ? (
-              <>
-                <HiMail
+        {leftDashBarState !== "recording" ? (
+          <div className="relative">
+            <button
+              onClick={() => {
+                // Simulate a recording with a dummy URL
+                setRecordingUrl("https://www2.cs.uic.edu/~i101/SoundFiles/BabyElephantWalk60.wav");
+                setLeftDashBarState("recording");
+              }}
+              className="text-indigo-300 hover:text-white transition"
+            >
+              <HiMail
+                size={26}
+                className="mt-[-5px] cursor-pointer hover:text-indigo-300 transition"
+              />
+            </button>
+            <button
+              aria-label={leftDashBarState === "listFriends" ? "View friend requests" : "Back to friends"}
+              className="text-indigo-300 hover:text-white transition"
+              onClick={() => {
+                setLeftDashBarState(prev => prev === "listFriends" ? "listFriendRequests" : "listFriends");
+                setNewFriendMessage("");
+              }}
+            >
+              {leftDashBarState === "listFriends" ? (
+                <>
+                  <HiMail
+                    size={26}
+                    className="mt-[-5px] cursor-pointer hover:text-indigo-300 transition"
+                  />
+                  {friendRequests.length > 0 && (
+                    <div className="absolute -top-3.5 -right-3.5 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                      {friendRequests.length}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <HiArrowLeft
                   size={26}
                   className="mt-[-5px] cursor-pointer hover:text-indigo-300 transition"
                 />
-                {friendRequests.length > 0 && (
-                  <div className="absolute -top-3.5 -right-3.5 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                    {friendRequests.length}
-                  </div>
-                )}
-              </>
-            ) : (
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="relative">
+            <button
+              onClick={handleCancelRecording}
+              className="text-indigo-300 hover:text-white transition"
+            >
               <HiArrowLeft
                 size={26}
                 className="mt-[-5px] cursor-pointer hover:text-indigo-300 transition"
               />
-            )}
-          </button>
-        </div>
+            </button>
+          </div>
+        )}
       </div>
 
       {leftDashBarState === "listFriends" && (
-        <div>
+        <>
           <div className="flex gap-3 items-center mt-[-10px]">
             <input
               type="text"
@@ -247,35 +294,100 @@ export default function LeftBar({ user }: LeftBarProps) {
             </button>
           </div>
 
-          <p className="text-s text-white mt-7 flex items-start gap-1">
+          <p className="text-s text-white mt-[-10] flex items-start gap-1">
             <span className="text-black">•</span>
             <span>
               Search by username <span className="italic">OR</span> full name
             </span>
           </p>
+
+          <div className="mt-[-5]">
+            <Chat 
+              llmMode="user_called" 
+              onRecordingComplete={handleRecordingComplete}
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 mt-[-5]">
+            {friends.map((friend) => (
+              <div
+                key={friend.id}
+                className="bg-purple-800/50 rounded-lg p-4 hover:bg-purple-800/70 transition cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-lg font-bold">
+                    {friend.firstname[0]}{friend.lastname[0]}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{friend.firstname} {friend.lastname}</h3>
+                    <p className="text-sm text-indigo-300">@{friend.username}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {leftDashBarState === "recording" && recordingUrl && (
+        <div className="flex flex-col gap-4">
+          <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm">
+            <h3 className="text-xl font-semibold mb-4">Your Recording</h3>
+            <audio 
+              controls 
+              className="w-full"
+              src={recordingUrl}
+            >
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <button
+              onClick={handleSendRecording}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 cursor-pointer text-white px-4 py-2 rounded-full font-semibold transition"
+            >
+              {selectedFriendIds.length === 0 
+                ? "Send to All Friends" 
+                : `Send to ${selectedFriendIds.length} Selected Friend${selectedFriendIds.length === 1 ? '' : 's'}`}
+            </button>
+
+            <div className="max-h-48 overflow-y-auto">
+              {friends.map((friend) => (
+                <div
+                  key={friend.id}
+                  className="flex items-center gap-3 p-2 hover:bg-purple-800/50 rounded-lg cursor-pointer"
+                  onClick={() => {
+                    const selectedFriends = new Set(selectedFriendIds);
+                    if (selectedFriends.has(friend.id)) {
+                      selectedFriends.delete(friend.id);
+                    } else {
+                      selectedFriends.add(friend.id);
+                    }
+                    setSelectedFriendIds(Array.from(selectedFriends));
+                  }}
+                >
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition
+                    ${selectedFriendIds.includes(friend.id) 
+                      ? 'bg-indigo-600 border-indigo-600' 
+                      : 'border-indigo-300'}`}
+                  >
+                    {selectedFriendIds.includes(friend.id) && (
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{friend.firstname} {friend.lastname}</h3>
+                    <p className="text-sm text-indigo-300">@{friend.username}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      {leftDashBarState === "listFriends" ? (
-        <div className="flex flex-col gap-3 mt-[-5]">
-          {friends.map((friend) => (
-            <div
-              key={friend.id}
-              className="bg-purple-800/50 rounded-lg p-4 hover:bg-purple-800/70 transition cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-lg font-bold">
-                  {friend.firstname[0]}{friend.lastname[0]}
-                </div>
-                <div>
-                  <h3 className="font-semibold">{friend.firstname} {friend.lastname}</h3>
-                  <p className="text-sm text-indigo-300">@{friend.username}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
+      {leftDashBarState === "listFriendRequests" && (
         <div className="flex flex-col gap-3 mt-4">
           {friendRequests.length > 0 ? (
             friendRequests.map((request) => (
