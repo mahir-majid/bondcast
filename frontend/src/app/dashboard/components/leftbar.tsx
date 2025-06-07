@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { HiMail, HiArrowLeft } from "react-icons/hi";
 import Chat from "../../components/Chat";
+import FancyRecording from "./fancyRecording";
 
 interface Friend {
   id: number;
@@ -60,11 +61,13 @@ export default function LeftBar({ user }: LeftBarProps) {
   const [newFriend, setNewFriend] = useState("");
   const [newFriendMessage, setNewFriendMessage] = useState("");
   const [newFriendSuccess, setNewFriendSuccess] = useState<boolean | null>(null);
+  const [isMessageVisible, setIsMessageVisible] = useState(false);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [leftDashBarState, setLeftDashBarState] = useState<LeftDashBarState>("listFriends");
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<number[]>([]);
+  const [showSuccess, setShowSuccess] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -139,6 +142,13 @@ export default function LeftBar({ user }: LeftBarProps) {
     if (!newFriend.trim()) {
       setNewFriendMessage("Can't leave field Empty");
       setNewFriendSuccess(false);
+      setIsMessageVisible(true);
+      setTimeout(() => {
+        setIsMessageVisible(false);
+        setTimeout(() => {
+          setNewFriendMessage("");
+        }, 300);
+      }, 2700);
       return;
     }
 
@@ -146,6 +156,13 @@ export default function LeftBar({ user }: LeftBarProps) {
     if (!token) {
       setNewFriendMessage("You must be logged in to send a friend request.");
       setNewFriendSuccess(false);
+      setIsMessageVisible(true);
+      setTimeout(() => {
+        setIsMessageVisible(false);
+        setTimeout(() => {
+          setNewFriendMessage("");
+        }, 300);
+      }, 2700);
       return;
     }
 
@@ -160,21 +177,41 @@ export default function LeftBar({ user }: LeftBarProps) {
       });
 
       const data = await response.json();
-      // console.log(data);
 
       if (!data.error) {
         setNewFriendMessage("Friend request sent successfully!");
         setNewFriendSuccess(true);
         setNewFriend(""); // Clear the input field
+        setIsMessageVisible(true);
+        setTimeout(() => {
+          setIsMessageVisible(false);
+          setTimeout(() => {
+            setNewFriendMessage("");
+          }, 300);
+        }, 2700);
       } else {
         setNewFriendSuccess(false);
         console.log(data.error);
         const errorMessage = data.error || "Failed to send friend request.";
         setNewFriendMessage(errorMessage);
+        setIsMessageVisible(true);
+        setTimeout(() => {
+          setIsMessageVisible(false);
+          setTimeout(() => {
+            setNewFriendMessage("");
+          }, 300);
+        }, 2700);
       }
     } catch (error) {
       setNewFriendMessage("An error occurred while sending the friend request.");
       setNewFriendSuccess(false);
+      setIsMessageVisible(true);
+      setTimeout(() => {
+        setIsMessageVisible(false);
+        setTimeout(() => {
+          setNewFriendMessage("");
+        }, 300);
+      }, 2700);
     }
   };
 
@@ -254,9 +291,22 @@ export default function LeftBar({ user }: LeftBarProps) {
       });
       formData.append('audio', audioFile);
       
-      selectedFriendIds.forEach(id => {
+      // If no friends are selected, send to all friends
+      const recipientsToSend = selectedFriendIds.length === 0 
+        ? friends.map(friend => friend.id)
+        : selectedFriendIds;
+
+      // Log the recipients for debugging
+      console.log('Sending to recipients:', recipientsToSend);
+
+      recipientsToSend.forEach(id => {
         formData.append('to_users[]', id.toString());
       });
+
+      // Log the FormData contents for debugging
+      for (let pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+      }
 
       const uploadResponse = await fetch(`${baseURL}/api/recordings/upload/`, {
         method: 'POST',
@@ -266,18 +316,30 @@ export default function LeftBar({ user }: LeftBarProps) {
         body: formData,
       });
 
+      const responseData = await uploadResponse.json();
+
       if (uploadResponse.ok) {
-        // Clear the recording and reset state
-        setRecordingUrl(null);
-        setSelectedFriendIds([]);
-        setLeftDashBarState("listFriends");
+        // Show success message
+        setShowSuccess(true);
+        
+        // Clear the recording and reset state after a delay
+        setTimeout(() => {
+          setRecordingUrl(null);
+          setSelectedFriendIds([]);
+          setLeftDashBarState("listFriends");
+          setShowSuccess(false);
+        }, 2000);
+        
         console.log("Successfully sent recording!")
       } else {
         const errorData = await uploadResponse.json();
         console.error('Failed to upload recording:', errorData);
+        alert(`Failed to send recording: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error sending recording:', error);
+      // Show error to user
+      alert('Error sending recording. Please try again.');
     }
   };
 
@@ -296,19 +358,6 @@ export default function LeftBar({ user }: LeftBarProps) {
         </h2>
         {leftDashBarState !== "recording" ? (
           <div className="relative">
-            <button
-              onClick={() => {
-                // Simulate a recording with a dummy URL
-                setRecordingUrl("https://www2.cs.uic.edu/~i101/SoundFiles/BabyElephantWalk60.wav");
-                setLeftDashBarState("recording");
-              }}
-              className="text-indigo-300 hover:text-white transition"
-            >
-              <HiMail
-                size={26}
-                className="mt-[-5px] cursor-pointer hover:text-indigo-300 transition"
-              />
-            </button>
             <button
               aria-label={leftDashBarState === "listFriends" ? "View friend requests" : "Back to friends"}
               className="text-indigo-300 hover:text-white transition"
@@ -373,9 +422,9 @@ export default function LeftBar({ user }: LeftBarProps) {
           {newFriendMessage && (
             <div className="absolute right-30 top-19 z-50 transform -translate-y-full">
               <div
-                className={`w-32 rounded-lg px-4 py-2 text-sm shadow-lg text-white whitespace-normal break-words ${
+                className={`w-32 rounded-lg px-4 py-2 text-sm shadow-lg text-white whitespace-normal break-words transition-opacity duration-300 ${
                   newFriendSuccess ? "bg-green-600" : "bg-red-600"
-                }`}
+                } ${isMessageVisible ? 'opacity-100' : 'opacity-0'}`}
               >
                 {newFriendMessage}
                 <div
@@ -422,23 +471,32 @@ export default function LeftBar({ user }: LeftBarProps) {
         <div className="flex flex-col gap-4">
           <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border-2 border-transparent hover:border-indigo-400/30 hover:shadow-[0_0_20px_rgba(129,140,248,0.3)] transition-all duration-200">
             <h3 className="text-xl font-semibold mb-4">Your Recording</h3>
-            <audio 
-              controls 
+            <FancyRecording 
+              audioSrc={recordingUrl}
               className="w-full"
-              src={recordingUrl}
-            >
-              Your browser does not support the audio element.
-            </audio>
+            />
           </div>
 
           <div className="flex flex-col gap-4">
             <button
               onClick={handleSendRecording}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 cursor-pointer text-white px-4 py-2 rounded-full font-semibold transition"
+              className={`w-full bg-indigo-600 hover:bg-indigo-700 cursor-pointer text-white px-4 py-2 rounded-full font-semibold transition relative ${
+                showSuccess ? 'bg-green-600 hover:bg-green-700' : ''
+              }`}
+              disabled={showSuccess}
             >
-              {selectedFriendIds.length === 0 
-                ? "Send to All Friends" 
-                : `Send to ${selectedFriendIds.length} Selected Friend${selectedFriendIds.length === 1 ? '' : 's'}`}
+              {showSuccess ? (
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Sent Successfully!
+                </div>
+              ) : (
+                selectedFriendIds.length === 0 
+                  ? `Send to All Friends` 
+                  : `Send to ${selectedFriendIds.length} Selected Friend${selectedFriendIds.length === 1 ? '' : 's'}`
+              )}
             </button>
 
             <div className="max-h-[calc(100vh-400px)] overflow-y-auto custom-scrollbar">

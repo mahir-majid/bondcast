@@ -5,6 +5,7 @@ import { useAuth } from "../components/AuthContext";
 import { useRouter } from "next/navigation";
 import AuthNavbar from "../components/AuthNavbar";
 import LeftBar from "./components/leftbar";
+import FancyRecording from "./components/fancyRecording";
 
 interface Recording {
   id: number;
@@ -75,7 +76,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
             {recordings.map((recording) => {
               return (
-                <div key={recording.id} className="bg-white/10 backdrop-blur-sm rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-indigo-400/30 hover:shadow-[0_0_20px_rgba(129,140,248,0.3)] transition-all duration-200">
+                <div key={recording.id} className="bg-white/10 backdrop-blur-sm rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-white/20 transition-all duration-200">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-lg font-bold">
                       {recording.sender.firstname[0]}{recording.sender.lastname[0]}
@@ -87,26 +88,12 @@ export default function Dashboard() {
                       <p className="text-sm text-black">@{recording.sender.username}</p>
                     </div>
                   </div>
-                  <audio 
-                    controls 
-                    className="w-full" 
-                    preload="metadata"
-                    onError={(e) => {
-                      const audioElement = e.target as HTMLAudioElement;
-                      console.error('Audio error details:', {
-                        error: audioElement.error,
-                        networkState: audioElement.networkState,
-                        readyState: audioElement.readyState,
-                        src: audioElement.src
-                      });
-                    }}
-                  >
-                    <source 
-                      src={`data:audio/webm;base64,${recording.audio_data}`}
-                      type="audio/webm"
-                    />
-                    Your browser does not support the audio element.
-                  </audio>
+                  <FancyRecording 
+                    audioSrc={`data:audio/webm;base64,${recording.audio_data}`}
+                    sender={recording.sender}
+                    showSender={false}
+                    className="w-full"
+                  />
                   <p className="text-sm text-black mt-2">
                     {new Date(recording.created_at).toLocaleDateString()}
                   </p>
