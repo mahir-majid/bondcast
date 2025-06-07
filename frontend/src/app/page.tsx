@@ -8,10 +8,14 @@ export default function Home() {
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-6 sm:px-12 py-24 gap-10">
         <h2 className="text-4xl sm:text-5xl font-extrabold leading-tight drop-shadow-2xl max-w-full whitespace-nowrap">
-          Where Bonds Run Deep as the Ocean
+           Keeping in Touch on Autopilot
         </h2>
-             <p className="text-lg sm:text-xl font-medium max-w-2xl text-white/90">
-          <span className="text-xl sm:text-2xl font-medium\">Bondiver is your space to stay close, laugh harder, and grow deeper bonds because relationships should never go away</span>
+        <p className="text-lg sm:text-xl font-medium max-w-2xl text-white/90">
+          <span className="text-xl sm:text-2xl font-medium">
+            Use conversational voice AI to make staying close effortless <br/>
+            so even 10 years later, everyone is still up to date with your life
+             
+          </span>
         </p>
 
         <div className="flex gap-4 mt-6 flex-col sm:flex-row">
@@ -30,20 +34,9 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Emotional CTA */}
-      <section className="bg-indigo-600 text-teal-100 text-center py-16 px-6 sm:px-20">
-        <h3 className="text-3xl sm:text-4xl font-bold mb-4">
-          Reconnect. Rekindle. Remember.
-        </h3>
-        <p className="text-lg max-w-3xl mx-auto text-teal-100/80">
-          Your closest friends deserve more than stories that disappear. 
-          Build shared memories that last a lifetime — one message, one moment, one smile at a time.
-        </p>
-      </section>
-
       {/* Footer */}
       <footer className="text-center py-6 text-sm text-white/70 bg-indigo-950">
-        © {new Date().getFullYear()} Bondiver — Dive Deeper.
+        © {new Date().getFullYear()} Bondiver — Built to Keep You Close.
       </footer>
     </div>
   );

@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CHUNK_SAMPLES = 16000 // 4  
-SILENCE_THRESHOLD = 0.2  # seconds of silence before processing
+SILENCE_THRESHOLD = 0.4  # seconds of silence before processing
 STREAM_TIMEOUT = 5  # seconds of silence before ending stream
 FIRST_TIMEOUT = 5
 SECOND_TIMEOUT = 5

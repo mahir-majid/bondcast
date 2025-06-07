@@ -15,4 +15,5 @@ class AudioClip(models.Model):
     recipients = models.ManyToManyField(User, related_name='received_recordings')
     s3_url = models.URLField()
     created_at = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField
 

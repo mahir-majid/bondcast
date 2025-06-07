@@ -81,7 +81,10 @@ export default function Join() {
       const res = await fetch(`${baseURL}/api/users/register/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          dob: form.dob  // Just send the raw date string
+        }),
       });
 
       if (!res.ok) {
@@ -140,7 +143,7 @@ export default function Join() {
             <input type="text" name="verificationCode" placeholder="6-digit code" value={verificationCode} onChange={(e) => { setVerificationCode(e.target.value); setErrors({ ...errors, verificationCode: undefined }); }} required pattern="\d{6}" maxLength={6} className={`p-3 rounded bg-white/20 text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-white ${errors.verificationCode ? "ring-red-500 ring-2" : ""}`} />
             {errors.verificationCode && <p className="text-red-300 text-sm text-left">{errors.verificationCode}</p>}
 
-            <button type="submit" disabled={isLoading} className="bg-white text-blue-700 py-3 rounded font-semibold text-lg hover:bg-blue-100 transition disabled:opacity-60">
+            <button type="submit" disabled={isLoading} className="bg-white text-blue-700 py-3 rounded font-semibold text-lg hover:bg-blue-100 transition disabled:opacity-60 cursor-pointer">
               {isLoading ? "Verifying..." : "Verify Code"}
             </button>
           </form>

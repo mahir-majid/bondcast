@@ -32,6 +32,28 @@ interface LeftBarProps {
   };
 }
 
+const scrollbarStyles = `
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 12px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(88, 28, 135, 0.3);
+    border-radius: 8px;
+    margin: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #6366f1, #4f46e5);
+    border-radius: 8px;
+    border: 2px solid rgba(88, 28, 135, 0.3);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #818cf8, #6366f1);
+  }
+`;
+
 export default function LeftBar({ user }: LeftBarProps) {
   const baseURL = process.env.NEXT_PUBLIC_URL;
   const websocketURL = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
@@ -44,6 +66,15 @@ export default function LeftBar({ user }: LeftBarProps) {
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<number[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = scrollbarStyles;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const connectToFriendRequests = () => {
     if (!user) return;
@@ -256,7 +287,7 @@ export default function LeftBar({ user }: LeftBarProps) {
   };
 
   return (
-    <aside className="w-96 bg-gradient-to-b from-purple-900 via-purple-800 to-purple-700 bg-opacity-80 rounded-xl p-6 flex flex-col gap-6 text-white shadow-lg">
+    <aside className="relative w-96 bg-gradient-to-b from-purple-900 via-purple-800 to-purple-700 bg-opacity-80 rounded-xl p-6 flex flex-col gap-6 text-white shadow-lg">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold mb-2 cursor-pointer text-blue-300">
           {leftDashBarState === "listFriends" ? "Friends" : 
@@ -326,10 +357,10 @@ export default function LeftBar({ user }: LeftBarProps) {
           <div className="flex gap-3 items-center mt-[-10px]">
             <input
               type="text"
-              placeholder="Add New Friend..."
+              placeholder="Add New Friend By Username"
               value={newFriend}
               onChange={(e) => setNewFriend(e.target.value)}
-              className="flex-1 rounded-full px-4 py-2 text-white border border-white bg-purple-800 placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+              className="flex-1 rounded-full px-4 py-2 text-white border-2 border-indigo-400/30 bg-purple-800/50 placeholder-white/70 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 focus:bg-purple-800 transition-all duration-200"
             />
             <button
               onClick={addFriend}
@@ -339,33 +370,46 @@ export default function LeftBar({ user }: LeftBarProps) {
             </button>
           </div>
 
+          {newFriendMessage && (
+            <div className="absolute right-30 top-19 z-50 transform -translate-y-full">
+              <div
+                className={`w-32 rounded-lg px-4 py-2 text-sm shadow-lg text-white whitespace-normal break-words ${
+                  newFriendSuccess ? "bg-green-600" : "bg-red-600"
+                }`}
+              >
+                {newFriendMessage}
+                <div
+                  className={`absolute right-3 top-full w-0 h-0 border-l-8 border-r-8 border-t-8 ${
+                    newFriendSuccess ? "border-t-green-600" : "border-t-red-600"
+                  } border-l-transparent border-r-transparent`}
+                />
+              </div>
+            </div>
+          )}
+
           <p className="text-s text-white mt-[-10] flex items-start gap-1">
             <span className="text-black">•</span>
-            <span>
-              Search by username <span className="italic">OR</span> full name
-            </span>
           </p>
-
-          <div className="mt-[-5]">
+          <div className="mt-[-40]">
             <Chat 
               llmMode="user_called" 
               onRecordingComplete={handleRecordingComplete}
             />
           </div>
 
-          <div className="flex flex-col gap-3 mt-[-5]">
+          <div className="flex flex-col gap-3 mt-[-5] max-h-[calc(100vh-325px)] overflow-y-auto custom-scrollbar">
             {friends.map((friend) => (
               <div
                 key={friend.id}
-                className="bg-purple-800/50 rounded-lg p-4 hover:bg-purple-800/70 transition cursor-pointer"
+                className="bg-purple-800/50 rounded-lg p-4 border-2 border-transparent hover:border-indigo-400/50 hover:bg-purple-800/70 hover:shadow-[0_0_15px_rgba(129,140,248,0.3)] transition-all duration-200 cursor-pointer group"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-lg font-bold">
+                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-lg font-bold group-hover:bg-indigo-500 group-hover:shadow-[0_0_10px_rgba(129,140,248,0.5)] transition-all duration-200">
                     {friend.firstname[0]}{friend.lastname[0]}
                   </div>
                   <div>
-                    <h3 className="font-semibold">{friend.firstname} {friend.lastname}</h3>
-                    <p className="text-sm text-indigo-300">@{friend.username}</p>
+                    <h3 className="font-semibold group-hover:text-indigo-200 transition-colors duration-200">{friend.firstname} {friend.lastname}</h3>
+                    <p className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors duration-200">@{friend.username}</p>
                   </div>
                 </div>
               </div>
@@ -376,7 +420,7 @@ export default function LeftBar({ user }: LeftBarProps) {
 
       {leftDashBarState === "recording" && recordingUrl && (
         <div className="flex flex-col gap-4">
-          <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm">
+          <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border-2 border-transparent hover:border-indigo-400/30 hover:shadow-[0_0_20px_rgba(129,140,248,0.3)] transition-all duration-200">
             <h3 className="text-xl font-semibold mb-4">Your Recording</h3>
             <audio 
               controls 
@@ -397,11 +441,11 @@ export default function LeftBar({ user }: LeftBarProps) {
                 : `Send to ${selectedFriendIds.length} Selected Friend${selectedFriendIds.length === 1 ? '' : 's'}`}
             </button>
 
-            <div className="max-h-48 overflow-y-auto">
+            <div className="max-h-[calc(100vh-400px)] overflow-y-auto custom-scrollbar">
               {friends.map((friend) => (
                 <div
                   key={friend.id}
-                  className="flex items-center gap-3 p-2 hover:bg-purple-800/50 rounded-lg cursor-pointer"
+                  className="flex items-center gap-3 p-2 hover:bg-purple-800/50 rounded-lg cursor-pointer border-2 border-transparent hover:border-indigo-400/50 hover:shadow-[0_0_15px_rgba(129,140,248,0.3)] transition-all duration-200 group"
                   onClick={() => {
                     const selectedFriends = new Set(selectedFriendIds);
                     if (selectedFriends.has(friend.id)) {
@@ -412,18 +456,18 @@ export default function LeftBar({ user }: LeftBarProps) {
                     setSelectedFriendIds(Array.from(selectedFriends));
                   }}
                 >
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200
                     ${selectedFriendIds.includes(friend.id) 
-                      ? 'bg-indigo-600 border-indigo-600' 
-                      : 'border-indigo-300'}`}
+                      ? 'bg-indigo-600 border-indigo-600 group-hover:shadow-[0_0_10px_rgba(129,140,248,0.5)]' 
+                      : 'border-indigo-300 group-hover:border-indigo-400'}`}
                   >
                     {selectedFriendIds.includes(friend.id) && (
                       <div className="w-2 h-2 bg-white rounded-full" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold">{friend.firstname} {friend.lastname}</h3>
-                    <p className="text-sm text-indigo-300">@{friend.username}</p>
+                    <h3 className="font-semibold group-hover:text-indigo-200 transition-colors duration-200">{friend.firstname} {friend.lastname}</h3>
+                    <p className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors duration-200">@{friend.username}</p>
                   </div>
                 </div>
               ))}
@@ -433,15 +477,15 @@ export default function LeftBar({ user }: LeftBarProps) {
       )}
 
       {leftDashBarState === "listFriendRequests" && (
-        <div className="flex flex-col gap-3 mt-4">
+        <div className="flex flex-col gap-3 mt-[-15]">
           {friendRequests.length > 0 ? (
             friendRequests.map((request) => (
               <div
                 key={request.from_user.id}
-                className="bg-purple-800/50 rounded-lg p-4"
+                className="bg-purple-800/50 rounded-lg p-4 border-2 border-indigo-400/30 hover:border-indigo-400 hover:bg-purple-800/70 hover:shadow-[0_0_15px_rgba(129,140,248,0.3)] transition-all duration-200"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-lg font-bold">
+                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-m font-bold">
                     {request.from_user.firstname?.[0]}{request.from_user.lastname?.[0]}
                   </div>
                   <div>
@@ -454,13 +498,13 @@ export default function LeftBar({ user }: LeftBarProps) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => acceptFriendRequest(request.from_user.username)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition cursor-pointer"
                   >
                     Accept
                   </button>
                   <button
                     onClick={() => declineFriendRequest(request.from_user.username)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition cursor-pointer"
                   >
                     Decline
                   </button>
@@ -472,23 +516,6 @@ export default function LeftBar({ user }: LeftBarProps) {
               No friend requests to display
             </div>
           )}
-        </div>
-      )}
-
-      {newFriendMessage && (
-        <div className="relative self-end -mt-2 mr-1">
-          <div
-            className={`z-3 absolute right-20 bottom-full mb-[7.5rem] max-w-[1200px] w-auto rounded-lg px-4 py-2 text-sm shadow-lg text-white ${
-              newFriendSuccess ? "bg-green-600" : "bg-red-600"
-            }`}
-          >
-            {newFriendMessage}
-            <div
-              className={`absolute right-3 top-full w-0 h-0 border-l-8 border-r-8 border-t-8 ${
-                newFriendSuccess ? "border-t-green-600" : "border-t-red-600"
-              } border-l-transparent border-r-transparent`}
-            />
-          </div>
         </div>
       )}
     </aside>
