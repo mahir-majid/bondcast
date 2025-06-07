@@ -60,8 +60,8 @@ export default function LeftBar({ user }: LeftBarProps) {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('Friend Requests:', data.friend_requests);
-        console.log('Friends:', data.user_friends);
+        // console.log('Friend Requests:', data.friend_requests);
+        // console.log('Friends:', data.user_friends);
         
         if (data && data.friend_requests && data.user_friends) {
           setFriends(data.user_friends);
@@ -129,7 +129,7 @@ export default function LeftBar({ user }: LeftBarProps) {
       });
 
       const data = await response.json();
-      console.log(data);
+      // console.log(data);
 
       if (!data.error) {
         setNewFriendMessage("Friend request sent successfully!");
@@ -201,8 +201,53 @@ export default function LeftBar({ user }: LeftBarProps) {
   };
 
   const handleSendRecording = async () => {
-    // TODO: Implement sending recording
-    console.log("Sending recording:", recordingUrl);
+    if (!recordingUrl) return;
+    
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      console.error("No access token found");
+      return;
+    }
+
+    try {
+      // Create a FormData object to send the audio file
+      const formData = new FormData();
+      
+      // Convert Blob URL to actual Blob
+      const response = await fetch(recordingUrl);
+      const audioBlob = await response.blob();
+      
+      // Create a proper File object with the correct MIME type
+      const audioFile = new File([audioBlob], 'recording.wav', { 
+        type: 'audio/webm' // Change to webm since that's what the browser records in
+      });
+      formData.append('audio', audioFile);
+      
+      selectedFriendIds.forEach(id => {
+        formData.append('to_users[]', id.toString());
+      });
+
+      const uploadResponse = await fetch(`${baseURL}/api/recordings/upload/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (uploadResponse.ok) {
+        // Clear the recording and reset state
+        setRecordingUrl(null);
+        setSelectedFriendIds([]);
+        setLeftDashBarState("listFriends");
+        console.log("Successfully sent recording!")
+      } else {
+        const errorData = await uploadResponse.json();
+        console.error('Failed to upload recording:', errorData);
+      }
+    } catch (error) {
+      console.error('Error sending recording:', error);
+    }
   };
 
   const handleCancelRecording = () => {
