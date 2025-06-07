@@ -79,7 +79,7 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
       mediaRecorder.onstop = () => {
         const blob = new Blob(recordingChunksRef.current, { type: "audio/webm" });
         const url = URL.createObjectURL(blob);
-        console.log("Recording complete:", url);
+        // console.log("Recording complete:", url);
         onRecordingComplete?.(url);
       };
 
@@ -91,7 +91,7 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
 
       // Handles initial connection to the websocket
       socket.onopen = () => {
-        console.log("WebSocket connected");
+        // console.log("WebSocket connected");
         setIsTalking(true);
         transcriptionSource.connect(transcriptionProcessor);
         transcriptionProcessor.connect(transcriptionContext.destination);
@@ -111,12 +111,12 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
           if (e.data instanceof ArrayBuffer) {
             // Skip partial chunks
             if (e.data.byteLength % 2 !== 0) {
-              console.log("Skipping partial audio chunk");
+              // console.log("Skipping partial audio chunk");
               return;
             }
 
             // Log chunk details
-            console.log(`Received audio chunk: size=${e.data.byteLength} bytes`);
+            // console.log(`Received audio chunk: size=${e.data.byteLength} bytes`);
             
             // Create copies of the buffer before any transfers
             const bufferCopy = e.data.slice(0);
@@ -138,7 +138,7 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
           } else {
             // Handle JSON messages
             const data = JSON.parse(e.data);
-            console.log(`Received from backend: ${JSON.stringify(data)}`);
+            // console.log(`Received from backend: ${JSON.stringify(data)}`);
             if (data.type === 'llm_response') {
               
             } else if (data.type === 'error') {
@@ -154,11 +154,11 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
     workletNodeTTS.port.onmessage = (event) => {
       const { type } = event.data;
       if (type === "audio_started" || type === "audio_done") {
-        console.log(`Audio state: ${type}`);
+        // console.log(`Audio state: ${type}`);
         if (socket.readyState === WebSocket.OPEN) {
           // Ensure the message is sent as a string
           const message = JSON.stringify({ type });
-          console.log(`Sending to backend: ${message}`);
+          // console.log(`Sending to backend: ${message}`);
           socket.send(message);
         }
       }
@@ -177,7 +177,7 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
 
     // Stop function
     const stop = () => {
-        console.log("Stopping audio and WebSocket");
+        // console.log("Stopping audio and WebSocket");
 
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ type: "audio_cleanup" }));

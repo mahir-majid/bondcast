@@ -86,7 +86,7 @@ export default function LeftBar({ user }: LeftBarProps) {
     const socket = new WebSocket(`${websocketURL}/ws/friend-requests/?username=${user.username}`);
 
     socket.onopen = () => {
-      console.log('Connected to friend requests WebSocket');
+      // console.log('Connected to friend requests WebSocket');
       // Send a proper JSON message
       socket.send(JSON.stringify({ type: 'ping' }));
     };
@@ -297,16 +297,16 @@ export default function LeftBar({ user }: LeftBarProps) {
         : selectedFriendIds;
 
       // Log the recipients for debugging
-      console.log('Sending to recipients:', recipientsToSend);
+      // console.log('Sending to recipients:', recipientsToSend);
 
       recipientsToSend.forEach(id => {
         formData.append('to_users[]', id.toString());
       });
 
       // Log the FormData contents for debugging
-      for (let pair of formData.entries()) {
-        console.log(pair[0], pair[1]);
-      }
+      // for (let pair of formData.entries()) {
+      //   console.log(pair[0], pair[1]);
+      // }
 
       const uploadResponse = await fetch(`${baseURL}/api/recordings/upload/`, {
         method: 'POST',
@@ -330,7 +330,7 @@ export default function LeftBar({ user }: LeftBarProps) {
           setShowSuccess(false);
         }, 1200);
         
-        console.log("Successfully sent recording!")
+        // console.log("Successfully sent recording!")
       } else {
         const errorData = await uploadResponse.json();
         console.error('Failed to upload recording:', errorData);
