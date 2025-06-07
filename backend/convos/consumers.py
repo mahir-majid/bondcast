@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CHUNK_SAMPLES = 16000 // 4  
-SILENCE_THRESHOLD = 0.3  # seconds of silence before processing
+SILENCE_THRESHOLD = 0.35  # seconds of silence before processing
 STREAM_TIMEOUT = 3  # seconds of silence before ending stream
 FIRST_TIMEOUT = 3
 SECOND_TIMEOUT = 3
@@ -356,7 +356,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Extract the full response content
             llm_response = groq_response.choices[0].message.content.strip()
 
-            if llm_response.lower() == "bondi silence" or llm_response == "\"Bondi Silence\"": 
+            if llm_response.lower() == "bondi silence" or llm_response.lower() == "bondi silence." or llm_response.lower() == "\"Bondi Silence\"": 
                 self.bondi_llm_triggered = False
                 logger.info("Bondi Silence: LLM TTS Response Getting Rejected bc not apropriate to respond right now")
                 return
