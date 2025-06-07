@@ -148,7 +148,7 @@ export default function LeftBar({ user }: LeftBarProps) {
         setTimeout(() => {
           setNewFriendMessage("");
         }, 300);
-      }, 2700);
+      }, 1800);
       return;
     }
 
@@ -162,7 +162,7 @@ export default function LeftBar({ user }: LeftBarProps) {
         setTimeout(() => {
           setNewFriendMessage("");
         }, 300);
-      }, 2700);
+      }, 1800);
       return;
     }
 
@@ -188,7 +188,7 @@ export default function LeftBar({ user }: LeftBarProps) {
           setTimeout(() => {
             setNewFriendMessage("");
           }, 300);
-        }, 2700);
+        }, 1800);
       } else {
         setNewFriendSuccess(false);
         console.log(data.error);
@@ -200,7 +200,7 @@ export default function LeftBar({ user }: LeftBarProps) {
           setTimeout(() => {
             setNewFriendMessage("");
           }, 300);
-        }, 2700);
+        }, 1800);
       }
     } catch (error) {
       setNewFriendMessage("An error occurred while sending the friend request.");
@@ -211,7 +211,7 @@ export default function LeftBar({ user }: LeftBarProps) {
         setTimeout(() => {
           setNewFriendMessage("");
         }, 300);
-      }, 2700);
+      }, 1800);
     }
   };
 
@@ -328,7 +328,7 @@ export default function LeftBar({ user }: LeftBarProps) {
           setSelectedFriendIds([]);
           setLeftDashBarState("listFriends");
           setShowSuccess(false);
-        }, 2000);
+        }, 1200);
         
         console.log("Successfully sent recording!")
       } else {
