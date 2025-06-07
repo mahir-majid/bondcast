@@ -479,7 +479,7 @@ export default function LeftBar({ user }: LeftBarProps) {
 
           <div className="flex flex-col gap-4">
             <button
-              onClick={handleSendRecording}
+              onClick={friends.length === 0 ? () => setLeftDashBarState("listFriends") : handleSendRecording}
               className={`w-full bg-indigo-600 hover:bg-indigo-700 cursor-pointer text-white px-4 py-2 rounded-full font-semibold transition relative ${
                 showSuccess ? 'bg-green-600 hover:bg-green-700' : ''
               }`}
@@ -492,6 +492,8 @@ export default function LeftBar({ user }: LeftBarProps) {
                   </svg>
                   Sent Successfully!
                 </div>
+              ) : friends.length === 0 ? (
+                "Add a Friend to Send Recordings"
               ) : (
                 selectedFriendIds.length === 0 
                   ? `Send to All Friends` 
@@ -499,37 +501,39 @@ export default function LeftBar({ user }: LeftBarProps) {
               )}
             </button>
 
-            <div className="max-h-[calc(100vh-400px)] overflow-y-auto custom-scrollbar">
-              {friends.map((friend) => (
-                <div
-                  key={friend.id}
-                  className="flex items-center gap-3 p-2 hover:bg-purple-800/50 rounded-lg cursor-pointer border-2 border-transparent hover:border-indigo-400/50 hover:shadow-[0_0_15px_rgba(129,140,248,0.3)] transition-all duration-200 group"
-                  onClick={() => {
-                    const selectedFriends = new Set(selectedFriendIds);
-                    if (selectedFriends.has(friend.id)) {
-                      selectedFriends.delete(friend.id);
-                    } else {
-                      selectedFriends.add(friend.id);
-                    }
-                    setSelectedFriendIds(Array.from(selectedFriends));
-                  }}
-                >
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200
-                    ${selectedFriendIds.includes(friend.id) 
-                      ? 'bg-indigo-600 border-indigo-600 group-hover:shadow-[0_0_10px_rgba(129,140,248,0.5)]' 
-                      : 'border-indigo-300 group-hover:border-indigo-400'}`}
+            {friends.length > 0 && (
+              <div className="max-h-[calc(100vh-400px)] overflow-y-auto custom-scrollbar">
+                {friends.map((friend) => (
+                  <div
+                    key={friend.id}
+                    className="flex items-center gap-3 p-2 hover:bg-purple-800/50 rounded-lg cursor-pointer border-2 border-transparent hover:border-indigo-400/50 hover:shadow-[0_0_15px_rgba(129,140,248,0.3)] transition-all duration-200 group"
+                    onClick={() => {
+                      const selectedFriends = new Set(selectedFriendIds);
+                      if (selectedFriends.has(friend.id)) {
+                        selectedFriends.delete(friend.id);
+                      } else {
+                        selectedFriends.add(friend.id);
+                      }
+                      setSelectedFriendIds(Array.from(selectedFriends));
+                    }}
                   >
-                    {selectedFriendIds.includes(friend.id) && (
-                      <div className="w-2 h-2 bg-white rounded-full" />
-                    )}
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200
+                      ${selectedFriendIds.includes(friend.id) 
+                        ? 'bg-indigo-600 border-indigo-600 group-hover:shadow-[0_0_10px_rgba(129,140,248,0.5)]' 
+                        : 'border-indigo-300 group-hover:border-indigo-400'}`}
+                    >
+                      {selectedFriendIds.includes(friend.id) && (
+                        <div className="w-2 h-2 bg-white rounded-full" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold group-hover:text-indigo-200 transition-colors duration-200">{friend.firstname} {friend.lastname}</h3>
+                      <p className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors duration-200">@{friend.username}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold group-hover:text-indigo-200 transition-colors duration-200">{friend.firstname} {friend.lastname}</h3>
-                    <p className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors duration-200">@{friend.username}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
