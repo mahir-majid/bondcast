@@ -51,6 +51,24 @@ export default function Dashboard() {
     fetchRecordings();
   }, [user, baseURL]);
 
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Check if it's today
+    if (date.toDateString() === now.toDateString()) {
+      return `Sent Today at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    }
+    // Check if it's yesterday
+    if (date.toDateString() === yesterday.toDateString()) {
+      return `Sent Yesterday at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    }
+    // Otherwise show full date and time
+    return "Sent on " + date.toLocaleString();
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -69,23 +87,23 @@ export default function Dashboard() {
         <LeftBar user={user} />
 
         <section className="flex-1 p-6 max-w-full h-full overflow-y-auto">
-          <h1 className="text-4xl font-extrabold drop-shadow-2xl ml-10">
+          <h1 className="text-4xl font-extrabold drop-shadow-2xl ml-10 text-amber-800">
             {user.firstname}&apos;s Dashboard
           </h1>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {recordings.map((recording) => {
+            {[...recordings].reverse().map((recording) => {
               return (
                 <div key={recording.id} className="bg-white/10 backdrop-blur-sm rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-white/20 transition-all duration-200">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-lg font-bold">
+                    <div className="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center text-lg font-bold">
                       {recording.sender.firstname[0]}{recording.sender.lastname[0]}
                     </div>
                     <div>
                       <h3 className="font-semibold">
                         {recording.sender.firstname} {recording.sender.lastname}
                       </h3>
-                      <p className="text-sm text-black">@{recording.sender.username}</p>
+                      <p className="text-sm font-semibold text-white">@{recording.sender.username}</p>
                     </div>
                   </div>
                   <FancyRecording 
@@ -94,8 +112,8 @@ export default function Dashboard() {
                     showSender={false}
                     className="w-full"
                   />
-                  <p className="text-sm text-black mt-2">
-                    {new Date(recording.created_at).toLocaleDateString()}
+                  <p className="text-sm font-semibold text-purple-800 mt-2">
+                    {formatDateTime(recording.created_at)}
                   </p>
                 </div>
               );
