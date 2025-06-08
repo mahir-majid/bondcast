@@ -173,7 +173,9 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
     // Catching error in websocket stream / Closing stream when 
     // user ends it or stops talking
     socket.onerror = (e) => { console.error("WS error", e); stop(); };
-    socket.onclose = () => { console.log("WS closed"); stop(); };
+    socket.onclose = () => { 
+      // console.log("WS closed"); stop(); 
+    };
 
     // Stop function
     const stop = () => {

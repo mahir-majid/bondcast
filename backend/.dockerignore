@@ -1,0 +1,23 @@
+# flyctl launch added from .gitignore
+**\.env
+
+# flyctl launch added from backend\.gitignore
+backend\**\__pycache__\*
+backend\**\.env
+
+# flyctl launch added from convos\.gitignore
+convos\**\vosk-model-en-us-0.22
+convos\**\**\__pycache__
+convos\**\*.pyc
+convos\**\*.pyo
+convos\**\*.pyd
+
+# flyctl launch added from friends\.gitignore
+friends\**\__pycache__
+
+# flyctl launch added from recordings\.gitignore
+recordings\**\__pycache__
+
+# flyctl launch added from users\.gitignore
+users\**\__pycache__
+fly.toml

@@ -4,15 +4,13 @@ import time
 from vosk import Model, KaldiRecognizer
 from django.contrib.auth import get_user_model
 from channels.db import database_sync_to_async
-from groq import Groq, AsyncGroq
+from groq import AsyncGroq
 from dotenv import load_dotenv
 import os
 from pathlib import Path
 from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
 import random
-from pydantic import BaseModel
-import functools
 from concurrent.futures import ThreadPoolExecutor
 
 executor = ThreadPoolExecutor(max_workers=2)  # Put globally
