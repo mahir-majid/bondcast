@@ -12,6 +12,7 @@ from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
 import random
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 
 executor = ThreadPoolExecutor(max_workers=2)  # Put globally
 
@@ -28,10 +29,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CHUNK_SAMPLES = 16000 // 4  
-SILENCE_THRESHOLD = 0.35  # seconds of silence before processing
-STREAM_TIMEOUT = 3  # seconds of silence before ending stream
-FIRST_TIMEOUT = 3
-SECOND_TIMEOUT = 3
+SILENCE_THRESHOLD = 0.3  # seconds of silence before processing
+STREAM_TIMEOUT = 5  # seconds of silence before ending stream
+FIRST_TIMEOUT = 5
+SECOND_TIMEOUT = 5
 MAX_CALL_DURATION_TIME = 120
 
 # Initialize Vosk model
@@ -84,6 +85,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.passed_first_timeout = False
         self.passed_second_timeout = False
         self.bondi_llm_triggered = False
+        self.user_age = (date.today().year - user.dob.year) - ((date.today().month, date.today().day) < (user.dob.month, user.dob.day))
 
         # Initialize Vosk recognizer
         self.stt_recognizer = KaldiRecognizer(vosk_stt_model, 16000)
@@ -261,56 +263,53 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             llm_tts_system_context = ""
             llm_tts_input = ""
 
-            if silence_time > 2:
+            if silence_time > 3:
                 logger.info("LLM Response to User Silence Delay or Incomplete Response")
                 llm_tts_system_context = (
-                "You are Bondi, a real-time conversational voice agent. "
-                "Your job is to decide what to say in response to the user, based on the last thing you said and what they just said in return. "
+                f"Your name is Bondi, and you are a real-time conversational voice agent talking to {self.firstname} who is {self.user_age} years old. "
+                f"Your job is to decide what to say in response to {self.firstname}, based on the last thing you said and what {self.firstname} just said in return. "
 
-                "The user often speaks informally and may pause mid-thought, trail off, or leave sentences open-ended. "
-                "In this case, however, the user has been silent for quite a while—over 2 seconds—which strongly suggests they are either finished or unsure how to continue. "
+                f"{self.firstname} has been silent for quite a while—over 3 seconds—which strongly suggests {self.firstname} is either finished or unsure how to continue. "
 
-                "Even if their sentence sounds incomplete, now is a good moment to gently respond. "
-                "It’s okay to step in with warmth and care to help them continue, clarify, or just feel heard. "
+                f"Even if {self.firstname}'s sentence sounds incomplete, now is a good moment to respond. "
+                f"It’s okay to step in with enthusiasm to help {self.firstname} continue and clarify their thoughts. "
 
                 "Write a short, emotionally present reply in 1 or 2 casual, kind sentences. "
-                "Help the user complete their thought or ask a relevant, open-ended follow-up question. "
+                f"Help {self.firstname} complete their thought or ask a relevant, open-ended follow-up question. "
 
-                "Your tone should be calm, friendly, and non-intrusive. Be careful not to talk about yourself, and don’t just repeat what the user said. "
+                f"Your tone should be chill, friendly, and non-intrusive. Be careful not to talk about yourself, and don’t just repeat what {self.firstname} said. "
                 "Be helpful, curious, and human-like. "
 
                 f"Here is the full conversational history: {self.overall_text.strip()} "
                 )
 
                 llm_tts_input = (
-                    f"The user just said: \"{self.current_text}\" and paused for {int(silence_time * 1000)} ms. "
+                    f"{self.firstname} just said: \"{self.current_text}\" "
                     f"The last thing you (Bondi) said was: \"{self.agent_last_response}\" "
 
-                    "Even if the user’s message sounds incomplete, the long pause suggests they are done for now or could use a gentle nudge. "
+                    f"Even if the {self.firstname}'s message sounds incomplete, the long pause suggests {self.firstname} is done for now or could use a gentle nudge. "
                     "Respond with warmth and care—briefly and naturally—as if continuing a casual voice conversation ending your response with a question. "
                     "Do not explain anything. Just say the reply. Nothing else."
                 )
                 
             else:
                 llm_tts_system_context = (
-                "You are Bondi, a real-time conversational voice agent. "
-                "Your job is to decide what to say in response to the user, based on the last thing you said and what they just said in return. "
+                f"Your name is Bondi, and you are a real-time conversational voice agent talking to {self.firstname} who is {self.user_age} years old. "
+                f"Your job is to decide what to say in response to {self.firstname}, based on the last thing you said and what {self.firstname} just said in return. "
 
-                "You must be extremely cautious about interrupting the user. "
-                "If there is *any* sign that their message is vague, partial, mid-thought, or not a complete response — you must return: Bondi Silence. "
+                f"You must be extremely cautious about interrupting {self.firstname}. "
+                f"If there is *any* sign that {self.firstname}'s message is vague, partial, mid-thought, or not a complete response — you must return: Bondi Silence. "
+                "Say only that exact phrase: Bondi Silence with no punctuation or explanation. "
+                f"Do not try to be helpful if {self.firstname} clearly hasn't finished their sentence. "
+                f"Short or hanging phrases from {self.firstname} like \"I'm doing\", \"It was\", \"The thing is\", \"I feel like\", or \"I mean\" are all incomplete — they must trigger Bondi Silence. "
 
-                "Say only that exact phrase: Bondi Silence. No punctuation. No quotes. No explanation. "
-                "Do not guess. Do not try to be helpful if the user hasn’t clearly finished their sentence. Wait. "
-
-                "Even if the user pauses for a while, do not respond unless their message is a clear, complete sentence or meaningful thought. "
-                "Short or hanging phrases like \"I'm doing\", \"It was\", \"The thing is\", \"I feel like\", or \"I mean\" are all incomplete — they must trigger Bondi Silence. "
-
-                "If and only if the user clearly finishes a thought, you may respond. When you do: "
-                "- Use emotionally warm, casual language. Keep it friendly and low-key, like you're chatting with someone you care about. "
+                f"If and only if the {self.firstname} clearly finishes a thought, you may respond. When you do: "
+                "- Use casual and exciting friendly language. Keep it friendly and low-key, like you're chatting with someone you care about. "
+                f"- Behave as a extroverted friend asking casual questions to {self.firstname} instead of a therapist. "
                 "- Do not explain anything. If you choose to respond, just say the reply and nothing else. "
                 "- Write only 1 to 2 short, natural sentences. "
                 "- Always end with a gentle follow-up question. This keeps the conversation open and shows curiosity. "
-                "- Never talk about yourself. Never echo the user. Never explain what you're doing. Just respond as if you're present with them. "
+                f"- Never talk about yourself. Never echo {self.firstname}. Never explain what you're doing. Just respond as if you're present with them. "
 
                 f"Here is the full conversational history: {self.overall_text.strip()} "
 
