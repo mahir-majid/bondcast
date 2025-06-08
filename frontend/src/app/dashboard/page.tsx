@@ -21,7 +21,6 @@ interface Recording {
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
-  const router = useRouter();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const baseURL = process.env.NEXT_PUBLIC_URL;
 

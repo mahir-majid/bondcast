@@ -28,9 +28,13 @@ export default function SignIn() {
     try {
       await login(form.username, form.password);
       router.push("/dashboard");
-    } catch (error: any) {
-      const msg = error.message?.toLowerCase() || "";
-
+    } catch (error: unknown) {
+      let msg = "";
+    
+      if (error instanceof Error) {
+        msg = error.message?.toLowerCase() || "";
+      }
+    
       if (msg.includes("incorrect password")) {
         setError("Incorrect password.");
       } else if (msg.includes("username not found")) {

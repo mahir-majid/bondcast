@@ -52,7 +52,7 @@ export default function Join() {
 
       return Object.keys(newErrors).length === 0;
     } catch (err) {
-      alert("Error checking user info. Try again.");
+      alert(`Error checking user info: ${err} Try again.`);
       return false;
     } finally {
       setIsLoading(false);
