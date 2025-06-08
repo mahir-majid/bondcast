@@ -1,11 +1,10 @@
 "use client";
 
 import { useAuth } from "./AuthContext";
-import Link from "next/link";
 import { useState } from "react";
 
 export default function AuthNavbar() {
-  const { user, loading, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [showProfileCard, setShowProfileCard] = useState(false);
 
   // Function to format date

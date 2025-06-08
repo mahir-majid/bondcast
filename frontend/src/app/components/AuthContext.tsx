@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         localStorage.setItem("refreshToken", data.refresh);
       }
       return data.access;
-    } catch (error) {
+    } catch {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       return null;
@@ -127,7 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const data = await res.json();
         setUser(data);
       }
-    } catch (error) {
+    } catch {
       setUser(null);
     } finally {
       setLoading(false);

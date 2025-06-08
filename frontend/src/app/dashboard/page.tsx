@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../components/AuthContext";
-import { useRouter } from "next/navigation";
 import AuthNavbar from "../components/AuthNavbar";
 import LeftBar from "./components/leftbar";
 import FancyRecording from "./components/fancyRecording";

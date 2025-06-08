@@ -202,7 +202,7 @@ export default function LeftBar({ user }: LeftBarProps) {
           }, 300);
         }, 1800);
       }
-    } catch (error) {
+    } catch {
       setNewFriendMessage("An error occurred while sending the friend request.");
       setNewFriendSuccess(false);
       setIsMessageVisible(true);
@@ -315,8 +315,6 @@ export default function LeftBar({ user }: LeftBarProps) {
         },
         body: formData,
       });
-
-      const responseData = await uploadResponse.json();
 
       if (uploadResponse.ok) {
         // Show success message

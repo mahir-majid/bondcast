@@ -9,12 +9,6 @@ interface ChatProps {
   onRecordingComplete?: (url: string) => void;
 }
 
-interface Message {
-  type: 'transcription' | 'llm_response' | 'error';
-  content: string;
-  timestamp: number;
-}
-
 export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
   const { user } = useAuth();
   const [isTalking, setIsTalking] = useState(false);
