@@ -214,7 +214,7 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
     <div className="flex flex-col items-center gap-6 w-full max-w-2xl">
       <button
         onClick={handleClick}
-        className="px-6 py-3 cursor-pointer bg-gradient-to-r from-blue-500 to-blue-700 rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-800 active:scale-95 active:shadow-inner transition"
+        className="px-6 py-3 cursor-pointer rounded-lg bg-gradient-to-r from-purple-700 to-purple-900 text-amber-300 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(251,191,36,0.8)] hover:from-purple-600 hover:to-purple-800 hover:text-amber-200 active:scale-95 active:shadow-inner transition-all duration-200"
       >
         {isTalking ? "End Call" : "Call Bondi"}
       </button>

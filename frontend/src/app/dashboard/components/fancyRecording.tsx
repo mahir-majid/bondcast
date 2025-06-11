@@ -12,9 +12,10 @@ interface FancyRecordingProps {
   };
   showSender?: boolean;
   className?: string;
+  onPlay?: () => void;
 }
 
-export default function FancyRecording({ audioSrc, sender, showSender = false, className = '' }: FancyRecordingProps) {
+export default function FancyRecording({ audioSrc, sender, showSender = false, className = '', onPlay }: FancyRecordingProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -39,7 +40,10 @@ export default function FancyRecording({ audioSrc, sender, showSender = false, c
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handlePlay = () => setIsPlaying(true);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      onPlay?.();
+    };
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => {
       setIsPlaying(false);
@@ -54,7 +58,7 @@ export default function FancyRecording({ audioSrc, sender, showSender = false, c
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioSrc]);
+  }, [audioSrc, onPlay]);
 
   const togglePlay = () => {
     if (audioRef.current) {

@@ -44,7 +44,6 @@ export default function SignIn() {
       } else {
         setError("Login failed. Please try again.");
       }
-    } finally {
       setIsLoading(false);
     }
   }

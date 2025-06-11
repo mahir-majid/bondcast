@@ -15,5 +15,9 @@ class AudioClip(models.Model):
     recipients = models.ManyToManyField(User, related_name='received_recordings')
     s3_url = models.URLField()
     created_at = models.DateTimeField(auto_now_add=True)
-    active = models.BooleanField
+    active = models.BooleanField(default=True)
+    seen = models.BooleanField(default=False)  # New field to track if recording has been played
+
+    def __str__(self):
+        return f"Recording from {self.sender.username} at {self.created_at}"
 

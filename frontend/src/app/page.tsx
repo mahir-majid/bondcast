@@ -20,16 +20,10 @@ export default function Home() {
 
         <div className="flex gap-4 mt-6 flex-col sm:flex-row">
           <a
-            href="/join"
-            className="bg-white text-indigo-700 border-2 border-white hover:bg-transparent hover:text-white hover:border-white transition-colors px-6 py-3 rounded-full font-semibold text-sm sm:text-base shadow-lg"
-          >
-            Dive In
-          </a>
-          <a
             href="/signin"
             className="border-2 border-white hover:bg-white hover:text-indigo-700 transition-colors px-6 py-3 rounded-full font-semibold text-sm sm:text-base shadow-lg"
           >
-            Log In
+            Dive In
           </a>
         </div>
       </main>
