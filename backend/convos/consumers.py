@@ -240,18 +240,18 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     # Cancel any ongoing LLM processing when new speech is detected
                     if self.tts_llm_task and not self.tts_llm_task.done():
                         self.tts_llm_task.cancel()
-                        logger.info("Cancelled TTS LLM task due to new user input")
+                        # logger.info("Cancelled TTS LLM task due to new user input")
 
                     # Cancel any ongoing TTS streaming when new speech is detected
                     if self.tts_stream_task and not self.tts_stream_task.done():
                         self.tts_stream_task.cancel()
-                        logger.info("Cancelled TTS streaming task due to new user input")
+                        # logger.info("Cancelled TTS streaming task due to new user input")
 
                     self.current_text = partial_text
                     self.partial_last_commited_text = partial_text
                     self.partial_text_cache = ""  
                     self.last_baseline_audio_time = time.time()
-                    logger.info(f"transcription: {partial_text}")
+                    logger.info(f"TRANSCRIPTION: {partial_text}")
                     # logger.info(f"current text: {self.current_text}")
                 else:
                     self.partial_text_cache = partial_text
@@ -353,7 +353,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Extract the full response content
             llm_response = groq_response.choices[0].message.content.strip()
 
-            if llm_response.lower() == "bondi silence" or llm_response.lower() == "bondi silence." or llm_response.lower() == "\"Bondi Silence\"": 
+            if llm_response.lower() == "bondi silence" or llm_response.lower() == "bondi silence." or llm_response.lower() == "\"bondi silence\"": 
                 self.bondi_llm_triggered = False
                 logger.info("Bondi Silence: LLM TTS Response Getting Rejected bc not apropriate to respond right now")
                 return
