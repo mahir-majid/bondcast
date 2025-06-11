@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CHUNK_SAMPLES = 16000 // 4  
-SILENCE_THRESHOLD = 0.3  # seconds of silence before processing
+SILENCE_THRESHOLD = 0.7  # seconds of silence before processing
 STREAM_TIMEOUT = 5  # seconds of silence before ending stream
 FIRST_TIMEOUT = 5
 SECOND_TIMEOUT = 5
@@ -69,7 +69,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             
         self.user_id = user.id
         self.firstname = user.firstname
-        logger.info(f"Connected user {self.firstname} with llmMode: {self.llmMode}")
+        # logger.info(f"Connected user {self.firstname} with llmMode: {self.llmMode}")
 
         self.start_call_time = time.time()
         self.buf = bytearray()
@@ -111,7 +111,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
 
         await self._stream_tts(greeting)
         
-        logger.info(f"WS connected for user: {self.firstname}")
+        # logger.info(f"WS connected for user: {self.firstname}")
 
     @database_sync_to_async
     def get_user_by_username(self, username):
@@ -264,7 +264,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             llm_tts_input = ""
 
             if silence_time > 3:
-                logger.info("LLM Response to User Silence Delay or Incomplete Response")
+                # logger.info("LLM Response to User Silence Delay or Incomplete Response")
                 llm_tts_system_context = (
                 f"Your name is Bondi, and you are a real-time conversational voice agent talking to {self.firstname} who is {self.user_age} years old. "
                 f"Your job is to decide what to say in response to {self.firstname}, based on the last thing you said and what {self.firstname} just said in return. "
@@ -294,49 +294,36 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 
             else:
                 llm_tts_system_context = (
-                f"Your name is Bondi, and you are a real-time conversational voice agent talking to {self.firstname} who is {self.user_age} years old. "
-                f"Your job is to decide what to say in response to {self.firstname}, based on the last thing you said and what {self.firstname} just said in return. "
+                    f"Your name is Bondi, and you are a real-time conversational voice agent talking to {self.firstname}, who is {self.user_age} years old. "
+                    f"Your job is to reply to {self.firstname} based on the last thing you said and what {self.firstname} just said. "
+                    f"You are not a therapist or assistant—you’re a present, curious, warm friend. "
 
-                f"You must be extremely cautious about interrupting {self.firstname}. "
-                f"If there is *any* sign that {self.firstname}'s message is vague, partial, mid-thought, or not a complete response — you must return: Bondi Silence. "
-                "Say only that exact phrase: Bondi Silence with no punctuation or explanation. "
-                f"Do not try to be helpful if {self.firstname} clearly hasn't finished their sentence. "
-                f"Short or hanging phrases from {self.firstname} like \"I'm doing\", \"It was\", \"The thing is\", \"I feel like\", or \"I mean\" are all incomplete — they must trigger Bondi Silence. "
+                    f"If {self.firstname} still seems to be in the middle of a thought—if their message is vague, trails off, or sounds incomplete—then respond only with the word: silence. "
+                    "Do not explain or add anything. Just say: \"shush\". This allows the conversation to breathe. "
 
-                f"If and only if the {self.firstname} clearly finishes a thought, you may respond. When you do: "
-                "- Use casual and exciting friendly language. Keep it friendly and low-key, like you're chatting with someone you care about. "
-                f"- Behave as a extroverted friend asking casual questions to {self.firstname} instead of a therapist. "
-                "- Do not explain anything. If you choose to respond, just say the reply and nothing else. "
-                "- Write only 1 to 2 short, natural sentences. "
-                "- Always end with a gentle follow-up question. This keeps the conversation open and shows curiosity. "
-                f"- Never talk about yourself. Never echo {self.firstname}. Never explain what you're doing. Just respond as if you're present with them. "
+                    f"But if {self.firstname} clearly finishes a thought, respond in a way that shows you're *deeply listening*. "
+                    f"Focus on being engaging. Ask something that builds on what they just said. Bring up something specific, surprising, or thought-provoking. "
 
-                f"Here is the full conversational history: {self.overall_text.strip()} "
+                    "- Always speak in 1 or 2 short, natural-sounding sentences.\n"
+                    "- Always end with a specific, open-ended follow-up question tied directly to what they just said.\n"
+                    "- Never talk about yourself, your abilities, or explain what you're doing.\n"
+                    "- Avoid vague or boring questions like 'why?' or 'how does that make you feel?'—be real, be curious, dig into what’s interesting."
 
-                "Examples of messages that are *not* complete and should trigger Bondi Silence:\n"
-                "- \"I'm doing\"\n"
-                "- \"Because I was\"\n"
-                "- \"Well...\"\n"
-                "- \"And then I\"\n"
-                "- \"The thing is\"\n"
-                "- \"I feel like\"\n"
-                "- \"It's kind of like\"\n"
-                "- Anything ending with a conjunction, filler, or hesitation\n"
-
-                "If you are not sure — always respond with: Bondi Silence"
+                    f"Here's the full conversation so far:\n{self.overall_text.strip()}"
                 )
 
                 llm_tts_input = (
-                    f"The user just said: \"{self.current_text}\" "
+                    f"{self.firstname} just said: \"{self.current_text}\" with {silence_time} milliseconds of silence " 
                     f"The last thing you (Bondi) said was: \"{self.agent_last_response}\" "
 
-                    "Decide if the user has clearly finished speaking. "
-                    "- If the message is incomplete or trails off, respond only with: Bondi Silence "
-                    "- If it’s a full thought, respond in 1–2 warm, casual sentences that always end with a gentle follow-up question. "
-                    "Do not explain anything. If you choose to respond, just say the reply and nothing else."
+                    "Decide whether the user's message is complete. "
+                    "- If it sounds like they’re still mid-thought—hesitating, rambling, or cutting off—respond only with the text: \"shush\" "
+                    "- But if they’ve finished a full thought, reply warmly and casually with 1–2 sentences that reflect what they said and ask a thoughtful follow-up question. "
+                    "Make it feel like a real back-and-forth between friends. "
+                    "Do not explain anything. If you respond, say only the reply. Nothing else."
                 )
 
-            logger.info(f"Preparing LLM Response")    
+            # logger.info(f"Preparing LLM Response")    
             # logger.info(f"LLM TTS Input: {llm_tts_input}")
 
             # Get groq response
@@ -353,9 +340,9 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Extract the full response content
             llm_response = groq_response.choices[0].message.content.strip()
 
-            if llm_response.lower() == "bondi silence" or llm_response.lower() == "bondi silence." or llm_response.lower() == "\"bondi silence\"": 
+            if "shush" in llm_response.lower():
                 self.bondi_llm_triggered = False
-                logger.info("Bondi Silence: LLM TTS Response Getting Rejected bc not apropriate to respond right now")
+                logger.info(f"Bondi Silence: LLM TTS Response Getting Rejected bc not apropriate to respond right now with following response: {llm_response}")
                 return
             else:
                 logger.info(f"LLM TTS Response Getting Accepted with following response: {llm_response}")
@@ -363,7 +350,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
 
         except asyncio.CancelledError:
             self.bondi_llm_triggered = False
-            logger.info("TTS LLM processing was cancelled mid-flight")
+            # logger.info("TTS LLM processing was cancelled mid-flight")
             return
         
 
