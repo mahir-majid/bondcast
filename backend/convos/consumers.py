@@ -271,7 +271,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 # If we're streaming audio, tell frontend to stop immediately
                 if self.streaming_text:
                     self.vosk_partial_count += 1
-                    if self.vosk_partial_count >= 3:
+                    if self.vosk_partial_count >= 2:
                         await self.send(text_data=json.dumps({"type": "stop_audio"}))
                         self.streaming_text = False
                         self.vosk_partial_count = 0
