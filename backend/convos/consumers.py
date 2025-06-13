@@ -33,11 +33,12 @@ logger = logging.getLogger(__name__)
 # For 16kHz audio, 800 samples = 50ms, 16000 samples = 1000ms
 # Let's use 3200 samples = 200ms to be safe
 CHUNK_SAMPLES = 3200  # 200ms of audio at 16kHz
-SILENCE_THRESHOLD = 0.7  # seconds of silence before processing
+SILENCE_THRESHOLD = 0.2  # seconds of silence before processing
 STREAM_TIMEOUT = 5  # seconds of silence before ending stream
 FIRST_TIMEOUT = 5
 SECOND_TIMEOUT = 5
 MAX_CALL_DURATION_TIME = 120
+
 
 # Initialize Vosk model
 model_path = "convos/vosk-model-en-us-0.15"  # Path relative to backend directory
@@ -92,6 +93,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
 
         # Initialize Vosk recognizer for partial transcription
         self.vosk_stt_recognizer = KaldiRecognizer(vosk_stt_model, 16000)
+        self.vosk_partial_count = 0
 
         # Initialize AssemblyAI STT
         self.assembly_stt = AssemblySTT(self._transcribe)
@@ -155,28 +157,23 @@ class SpeechConsumer(AsyncWebsocketConsumer):
 
     async def _check_silence_loop(self):
         while True:
-            if self.streaming_text or self.transcribing_text:
+            if self.transcribing_text:
                 await asyncio.sleep(0.1)
-                logger.info(f"Transcribing Text: {self.transcribing_text}")
                 continue
-            logger.info(f"Transcribing Text: {self.transcribing_text}")
             current_time = time.time()
             user_audio_delay = current_time - self.last_baseline_audio_time
             total_call_time = time.time() - self.start_call_time
 
-            if total_call_time > MAX_CALL_DURATION_TIME and not self.streaming_text and not self.transcribing_text: 
+            if user_audio_delay >= SILENCE_THRESHOLD and total_call_time > MAX_CALL_DURATION_TIME and not self.streaming_text and not self.transcribing_text: 
                 self.call_is_ending = True  # Set this before streaming to prevent race conditions
                 self.streaming_text = True
                 timeout_response = "Sorry but I have to go right now. It was nice chatting and I will talk to you later."
                 await self._stream_tts(timeout_response)
-                # Wait for streaming to complete before closing
-                while self.streaming_text:
-                    await asyncio.sleep(0.1)
-                await self.close(code=1000)  # Normal closure
+                # Connection will close when we receive audio_done
                 break
 
             # Normal silence threshold check
-            if not self.bondi_llm_triggered and self.llmMode == "user_called" and user_audio_delay >= SILENCE_THRESHOLD and self.current_user_input and not self.streaming_text and not self.transcribing_text:
+            if not self.bondi_llm_triggered and self.llmMode == "user_called" and user_audio_delay >= SILENCE_THRESHOLD and self.current_user_input and not self.transcribing_text:
                 self.bondi_llm_triggered = True
                 self.tts_llm_task = asyncio.create_task(self._process_tts_llm(user_audio_delay))
 
@@ -233,7 +230,9 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     self.conversation_history += "Bondi: " + f"\"{self.agent_last_response}\" "
                     self.buf.clear()  # Just clear the buffer, no need to send to AssemblyAI
                     logger.info("Frontend finished playing audio")
-
+                    # Close connection if this was the final timeout message
+                    if self.call_is_ending:
+                        await self.close(code=1000)  # Normal closure
                 elif data.get("type") == "audio_cleanup":
                     logger.info("Frontend audio cleanup complete")
                     self.streaming_text = False
@@ -249,7 +248,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.buf.extend(bytes_data)
 
         # Send chunks for transcription once we have enough data
-        if not self.streaming_text and len(self.buf) >= CHUNK_SAMPLES:
+        if len(self.buf) >= CHUNK_SAMPLES:
             chunk = self.buf[:CHUNK_SAMPLES]
             del self.buf[:CHUNK_SAMPLES]
 
@@ -259,13 +258,24 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Process with Vosk for partial transcription
             self.vosk_stt_recognizer.AcceptWaveform(bytes(chunk))
             partial_result = json.loads(self.vosk_stt_recognizer.PartialResult())
+
             if partial_result.get("partial"):
                 logger.info(f"Vosk Partial Triggered!")
                 self.last_baseline_audio_time = time.time()
                 self.justCalled = False
                 self.passed_first_timeout = False
                 self.passed_second_timeout = False
+
+                if not self.streaming_text: self.vosk_partial_count = 0
                 
+                # If we're streaming audio, tell frontend to stop immediately
+                if self.streaming_text:
+                    self.vosk_partial_count += 1
+                    if self.vosk_partial_count >= 3:
+                        await self.send(text_data=json.dumps({"type": "stop_audio"}))
+                        self.streaming_text = False
+                        self.vosk_partial_count = 0
+  
                 # Cancel any ongoing LLM processing when new speech is detected
                 if self.tts_llm_task and not self.tts_llm_task.done():
                     self.tts_llm_task.cancel()
@@ -317,12 +327,9 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     f"Your job is to reply to {self.firstname} based on the last thing you said and what {self.firstname} just said. "
                     f"Talk very casually and be entertaining. "
 
-                    f"If {self.firstname} still seems to be in the middle of a thought—if their message is vague, trails off, or sounds incomplete—then respond only with the word: silence. "
-                    "Do not explain or add anything. Just say: \"shush\". This allows the conversation to breathe. "
-
-                    f"But if {self.firstname} clearly finishes a thought, respond in a way that shows you're *deeply listening*. "
+                    f"Respond in a way that shows you're *deeply listening*. "
                     f"Focus on being engaging. Ask something that builds on what they just said. Bring up something specific, surprising, or thought-provoking. "
-
+                    f"Feel free to bring up the news or interesting facts relevant to the conversation. "
                     "- Always speak in 1 or 2 short, natural-sounding sentences.\n"
                     "- Always end with a specific, open-ended follow-up question tied directly to what they just said.\n"
                     "- Never talk about yourself, your abilities, or explain what you're doing.\n"
@@ -332,13 +339,10 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 )
 
                 llm_tts_input = (
-                    f"{self.firstname} just said: \"{self.current_user_input}\" with {silence_time} milliseconds of silence " 
+                    f"{self.firstname} just said: \"{self.current_user_input}\" " 
                     f"The last thing you (Bondi) said was: \"{self.agent_last_response}\" "
-
-                    "Decide whether the user's message is complete. "
-                    "- If it sounds like they're still mid-thought—hesitating, rambling, or cutting off—respond only with the text: \"shush\" "
-                    "- But if they've finished a full thought, reply warmly and casually with 1–2 sentences that reflect what they said and ask a thoughtful follow-up question. "
-                    "Make it feel like a real back-and-forth between friends. "
+                    "Reply warmly and casually with 1–2 sentences that reflect what they said and ask a thoughtful follow-up question. "
+                    "Make it feel like a real back-and-forth between friends and keep it casual, entertaining, and playful. "
                     "Do not explain anything. If you respond, say only the reply. Nothing else."
                 )
 
@@ -356,11 +360,8 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Extract the full response content
             llm_response = groq_response.choices[0].message.content.strip()
 
-            if "shush" in llm_response.lower():
+            if self.transcribing_text:
                 self.bondi_llm_triggered = False
-                logger.info(f"Bondi Silence: LLM TTS Response Getting Rejected bc not apropriate to respond right now with following response: {llm_response}")
-                return
-            elif self.transcribing_text:
                 logger.info(f"Bondi Silence: LLM TTS Response Getting Rejected bc transcribing_text is True")
                 return
             else:

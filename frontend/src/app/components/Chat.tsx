@@ -133,10 +133,17 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
             // Handle JSON messages
             const data = JSON.parse(e.data);
             // console.log(`Received from backend: ${JSON.stringify(data)}`);
-            if (data.type === 'llm_response') {
-              
-            } else if (data.type === 'error') {
+            if (data.type === 'error') {
               console.error('Error from backend:', data.content);
+            } else if (data.type === 'stop_audio') {
+              console.log("Received stop_audio from backend");
+              // Forward stop_audio message to both worklets
+              if (workletNodeTTSRef.current) {
+                workletNodeTTSRef.current.port.postMessage({ type: 'stop_audio' });
+              }
+              if (recordingTTSNodeRef.current) {
+                recordingTTSNodeRef.current.port.postMessage({ type: 'stop_audio' });
+              }
             }
           }
         } catch (error) {

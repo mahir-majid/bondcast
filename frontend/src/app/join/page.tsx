@@ -114,7 +114,7 @@ export default function Join() {
         <h1 className="text-5xl font-extrabold drop-shadow-lg">Dive In</h1>
 
         {step === "form" && (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full bg-purple-900/40 backdrop-blur-sm p-8 rounded-xl shadow-xl border border-white/20">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full bg-purple-950/60 backdrop-blur-sm p-8 rounded-xl shadow-xl border border-white/20">
             <div className="flex gap-4">
               <input type="text" name="firstname" placeholder="First Name" value={form.firstname} onChange={handleChange} className="w-1/2 p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white" />
               <input type="text" name="lastname" placeholder="Last Name" value={form.lastname} onChange={handleChange} className="w-1/2 p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white" />
@@ -138,7 +138,7 @@ export default function Join() {
         )}
 
         {step === "verifyCode" && (
-          <form onSubmit={handleVerifyCode} className="flex flex-col gap-4 w-full bg-purple-900/40 backdrop-blur-sm p-6 rounded-xl shadow-xl border border-white/20">
+          <form onSubmit={handleVerifyCode} className="flex flex-col gap-4 w-full bg-purple-950/60 backdrop-blur-sm p-6 rounded-xl shadow-xl border border-white/20">
             <p className="text-white/80">A verification code was sent to your email. Please enter it below:</p>
             <input type="text" name="verificationCode" placeholder="6-digit code" value={verificationCode} onChange={(e) => { setVerificationCode(e.target.value); setErrors({ ...errors, verificationCode: undefined }); }} required pattern="\d{6}" maxLength={6} className={`p-3 rounded bg-white/20 text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-white ${errors.verificationCode ? "ring-red-500 ring-2" : ""}`} />
             {errors.verificationCode && <p className="text-red-300 text-sm text-left">{errors.verificationCode}</p>}

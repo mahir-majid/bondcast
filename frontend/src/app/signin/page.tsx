@@ -55,7 +55,7 @@ export default function SignIn() {
       <main className="flex flex-col flex-1 items-center justify-center px-6 sm:px-12 text-center gap-8 max-w-lg mx-auto">
         <h1 className="text-5xl font-extrabold drop-shadow-lg whitespace-nowrap">Welcome Back</h1>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[28rem] bg-purple-900/40 backdrop-blur-sm p-10 rounded-xl shadow-xl border border-white/20">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[28rem] bg-purple-950/60 backdrop-blur-sm p-10 rounded-xl shadow-xl border border-white/20">
           <input
             type="text"
             name="username"
