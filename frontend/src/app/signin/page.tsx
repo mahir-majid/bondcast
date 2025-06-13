@@ -55,7 +55,7 @@ export default function SignIn() {
       <main className="flex flex-col flex-1 items-center justify-center px-6 sm:px-12 text-center gap-8 max-w-lg mx-auto">
         <h1 className="text-5xl font-extrabold drop-shadow-lg whitespace-nowrap">Welcome Back</h1>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[28rem] bg-white/10 p-10 rounded-xl shadow-xl">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[28rem] bg-purple-900/40 backdrop-blur-sm p-10 rounded-xl shadow-xl border border-white/20">
           <input
             type="text"
             name="username"
@@ -87,7 +87,7 @@ export default function SignIn() {
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-white text-blue-700 py-3 cursor-pointer rounded font-semibold text-lg hover:bg-blue-100 transition disabled:opacity-60"
+            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 cursor-pointer rounded font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-60"
           >
             {isLoading ? "Signing in..." : "Sign In"}
           </button>

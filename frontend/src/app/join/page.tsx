@@ -114,7 +114,7 @@ export default function Join() {
         <h1 className="text-5xl font-extrabold drop-shadow-lg">Dive In</h1>
 
         {step === "form" && (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full bg-white/10 p-8 rounded-xl shadow-xl">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full bg-purple-900/40 backdrop-blur-sm p-8 rounded-xl shadow-xl border border-white/20">
             <div className="flex gap-4">
               <input type="text" name="firstname" placeholder="First Name" value={form.firstname} onChange={handleChange} className="w-1/2 p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white" />
               <input type="text" name="lastname" placeholder="Last Name" value={form.lastname} onChange={handleChange} className="w-1/2 p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white" />
@@ -131,19 +131,19 @@ export default function Join() {
             <input type="password" name="password" placeholder="Password" value={form.password} onChange={handleChange} required minLength={6} className={`p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white ${errors.password ? "ring-red-500 ring-2" : ""}`} />
             {errors.password && <p className="text-red-300 text-sm text-left">{errors.password}</p>}
 
-            <button type="submit" disabled={isLoading} className="bg-white text-blue-700 cursor-pointer py-3 rounded font-semibold text-lg hover:bg-blue-100 transition disabled:opacity-60">
+            <button type="submit" disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white cursor-pointer py-3 rounded font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-60">
               {isLoading ? "Checking..." : "Create Account"}
             </button>
           </form>
         )}
 
         {step === "verifyCode" && (
-          <form onSubmit={handleVerifyCode} className="flex flex-col gap-4 w-full bg-white/10 p-6 rounded-xl shadow-xl">
+          <form onSubmit={handleVerifyCode} className="flex flex-col gap-4 w-full bg-purple-900/40 backdrop-blur-sm p-6 rounded-xl shadow-xl border border-white/20">
             <p className="text-white/80">A verification code was sent to your email. Please enter it below:</p>
             <input type="text" name="verificationCode" placeholder="6-digit code" value={verificationCode} onChange={(e) => { setVerificationCode(e.target.value); setErrors({ ...errors, verificationCode: undefined }); }} required pattern="\d{6}" maxLength={6} className={`p-3 rounded bg-white/20 text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-white ${errors.verificationCode ? "ring-red-500 ring-2" : ""}`} />
             {errors.verificationCode && <p className="text-red-300 text-sm text-left">{errors.verificationCode}</p>}
 
-            <button type="submit" disabled={isLoading} className="bg-white text-blue-700 py-3 rounded font-semibold text-lg hover:bg-blue-100 transition disabled:opacity-60 cursor-pointer">
+            <button type="submit" disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-60 cursor-pointer">
               {isLoading ? "Verifying..." : "Verify Code"}
             </button>
           </form>

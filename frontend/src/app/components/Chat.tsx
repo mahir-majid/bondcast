@@ -168,7 +168,14 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
     // user ends it or stops talking
     socket.onerror = (e) => { console.error("WS error", e); stop(); };
     socket.onclose = () => { 
-      // console.log("WS closed"); stop(); 
+      // console.log("WS closed"); 
+      stop();
+      // If we have recording chunks, create a recording
+      if (recordingChunksRef.current.length > 0) {
+        const blob = new Blob(recordingChunksRef.current, { type: "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        onRecordingComplete?.(url);
+      }
     };
 
     // Stop function
