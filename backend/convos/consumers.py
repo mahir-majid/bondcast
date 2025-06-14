@@ -12,6 +12,7 @@ from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
 import random
 from concurrent.futures import ThreadPoolExecutor
+import datetime
 from datetime import date
 from .assembly_stt import AssemblySTT
 
@@ -83,7 +84,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.current_user_input = ""
         self.agent_last_response = ""
         self.incoming_tts = ""
-        self.streaming_text = False
+        self.streaming_text = True
         self.transcribing_text = False
         self.call_is_ending = False
         self.passed_first_timeout = False
@@ -104,20 +105,29 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.tts_llm_task = None
         self.tts_stream_task = None
 
-        # Greet the User
-        greeting_options = [
-                    f"Hey {self.firstname}, how are you doing?",
-                    f"Hey, glad you called. How's it going?",
-                    f"Hey there! How have you been?",
-                    f"Hi! It's been a minute — how are you?",
-                    f"Hey {self.firstname}, what's new with you?",
-                    f"Hi {self.firstname}, how's your day going?"
-                ]
-
-        greeting = random.choice(greeting_options)
-
-        await self._stream_tts(greeting)
+        # Contextual History
+        call_datetime = datetime.datetime.fromtimestamp(self.start_call_time)
+        now = datetime.datetime.now()
+        time_of_day = ["late night", "morning", "afternoon", "evening"][
+            0 if call_datetime.hour < 5 or call_datetime.hour >= 22
+            else 1 if call_datetime.hour < 12
+            else 2 if call_datetime.hour < 17
+            else 3
+        ]
         
+        self.contextual_history = " ".join(filter(None, [
+            f"You are on a call with {self.firstname}, age {self.user_age}, on {call_datetime.strftime('%A')} at {call_datetime.strftime('%I:%M %p')} ({time_of_day}).",
+            f"It's {self.firstname}'s birthday today on {self.user.dob.month} {self.user.dob.day}." if (user.dob.month == now.month and user.dob.day == now.day) else None,
+            "It's Christmas Day." if (now.month == 12 and now.day == 25) else None,
+            "It's New Year's Day." if (now.month == 1 and now.day == 1) else None,
+        ]))
+
+        logger.info(f"Contextual History: {self.contextual_history}")
+
+        # Greet the User
+        self.bondi_llm_triggered = True
+        await self._stream_tts("Hello, how are you doing today?")
+
         # logger.info(f"WS connected for user: {self.firstname}")
 
     @database_sync_to_async
@@ -175,10 +185,10 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Normal silence threshold check
             if not self.bondi_llm_triggered and self.llmMode == "user_called" and user_audio_delay >= SILENCE_THRESHOLD and self.current_user_input and not self.transcribing_text:
                 self.bondi_llm_triggered = True
-                self.tts_llm_task = asyncio.create_task(self._process_tts_llm(user_audio_delay))
+                self.tts_llm_task = asyncio.create_task(self._process_tts_llm("normal"))
 
             # First timeout check
-            if not self.passed_first_timeout and not self.call_is_ending and user_audio_delay >= FIRST_TIMEOUT and not self.current_user_input:
+            if not self.streaming_text and not self.bondi_llm_triggered and not self.passed_first_timeout and not self.call_is_ending and user_audio_delay >= FIRST_TIMEOUT and not self.current_user_input:
                 logger.info("first timeout request made")
                 first_timeout_response = "Can you still hear me?"
                 self.passed_first_timeout = True
@@ -286,44 +296,30 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 
                 self.vosk_stt_recognizer.Reset()  # Clear the recognizer's internal state
 
-    async def _process_tts_llm(self, silence_time: float) -> None:
+    async def _process_tts_llm(self, response_type: str) -> None:
         try:
             self.bondi_llm_triggered = True
             llm_tts_system_context = ""
             llm_tts_input = ""
 
-            if silence_time > 3:
-                # logger.info("LLM Response to User Silence Delay or Incomplete Response")
+            logger.info(f"Entered TTS LLM Processing")
+
+            if response_type == "first-time":
                 llm_tts_system_context = (
-                f"Your name is Bondi, and you are a real-time conversational voice agent talking to {self.firstname} who is {self.user_age} years old. "
-                f"Your job is to decide what to say in response to {self.firstname}, based on the last thing you said and what {self.firstname} just said in return. "
-
-                f"{self.firstname} has been silent for quite a while—over 3 seconds—which strongly suggests {self.firstname} is either finished or unsure how to continue. "
-
-                f"Even if {self.firstname}'s sentence sounds incomplete, now is a good moment to respond. "
-                f"It's okay to step in with enthusiasm to help {self.firstname} continue and clarify their thoughts. "
-
-                "Write a short, emotionally present reply in 1 or 2 casual, kind sentences. "
-                f"Help {self.firstname} complete their thought or ask a relevant, open-ended follow-up question. "
-
-                f"Your tone should be chill, friendly, and non-intrusive. Be careful not to talk about yourself, and don't just repeat what {self.firstname} said. "
-                "Be helpful, curious, and human-like. "
-
-                f"Here is the full conversational history: {self.conversation_history.strip()} "
+                    f"Your name is Bondi and you are on a call with {self.firstname} who just called you. "
+                    f"Here's contextual history: {self.contextual_history}"
                 )
 
                 llm_tts_input = (
-                    f"{self.firstname} just said: \"{self.current_user_input}\" "
-                    f"The last thing you (Bondi) said was: \"{self.agent_last_response}\" "
-
-                    f"Even if the {self.firstname}'s message sounds incomplete, the long pause suggests {self.firstname} is done for now or could use a gentle nudge. "
-                    "Respond with warmth and care—briefly and naturally—as if continuing a casual voice conversation ending your response with a question. "
-                    "Do not explain anything. Just say the reply. Nothing else."
+                    f"Your name is Bondi and you are on  a call with {self.firstname} who just called you. "
+                    f"Spark a conversation with {self.firstname} and ask them a question. "
+                    f"ONLY say your casual call opener and your question. Nothing Else"
+                 
                 )
-                
-            else:
+
+            elif response_type == "normal":
                 llm_tts_system_context = (
-                    f"Your name is Bondi, and you are a real-time conversational voice agent talking to {self.firstname}, who is {self.user_age} years old. "
+                    f"Your name is Bondi, and you are on a call with {self.firstname}, who is {self.user_age} years old. "
                     f"Your job is to reply to {self.firstname} based on the last thing you said and what {self.firstname} just said. "
                     f"Talk very casually and be entertaining. "
 
@@ -334,8 +330,10 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     "- Always end with a specific, open-ended follow-up question tied directly to what they just said.\n"
                     "- Never talk about yourself, your abilities, or explain what you're doing.\n"
                     "- Be witty and playful, but still be engaging and interesting."
+                    "- Never say \"Haha\" in your answers"
 
                     f"Here's the full conversation so far:\n{self.conversation_history.strip()}"
+                    f"Here's contextual history about {self.firstname}: {self.contextual_history}"
                 )
 
                 llm_tts_input = (
@@ -345,6 +343,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     "Make it feel like a real back-and-forth between friends and keep it casual, entertaining, and playful. "
                     "Do not explain anything. If you respond, say only the reply. Nothing else."
                 )
+            
 
             # Get groq response
             groq_response = await groq_client.chat.completions.create(
@@ -354,8 +353,8 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     {"role": "user", "content": llm_tts_input}
                 ],
                 stream=False,  
-                temperature=0.7,
-                max_completion_tokens=100,
+                temperature=0.9,
+                max_completion_tokens=150,
             )
             # Extract the full response content
             llm_response = groq_response.choices[0].message.content.strip()
