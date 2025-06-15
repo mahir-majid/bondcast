@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { HiMail, HiArrowLeft } from "react-icons/hi";
 import Chat from "../../components/Chat";
-import FancyRecording from "./fancyRecording";
+import FancyRecording from "./fancyDashboardRecording";
+import FancySendRecording from "./fancySendRecording";
 
 interface Friend {
   id: number;
@@ -69,6 +70,7 @@ export default function LeftBar({ user }: LeftBarProps) {
   const [selectedFriendIds, setSelectedFriendIds] = useState<number[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [buttonText, setButtonText] = useState<string>("");
   const wsRef = useRef<WebSocket | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [recordingTitle, setRecordingTitle] = useState("");
@@ -304,7 +306,10 @@ export default function LeftBar({ user }: LeftBarProps) {
   const handleSendRecording = async () => {
     if (!recordingUrl) return;
     if (!recordingTitle.trim()) {
-      alert('Please enter a title for your recording.');
+      setButtonText("Please include a title");
+      setTimeout(() => {
+        setButtonText("");
+      }, 1300);
       return;
     }
     const token = localStorage.getItem("accessToken");
@@ -539,13 +544,12 @@ export default function LeftBar({ user }: LeftBarProps) {
                 {recordingTitle.length}/150 characters
               </div>
             </div>
-            <div className="mt-[-15px]">
-              <FancyRecording 
+            <div className="mt-[-10px]">
+              <FancySendRecording 
                 audioSrc={recordingUrl}
                 className="w-full"
               />
             </div>
-            
           </div>
 
           <div className="flex flex-col gap-4">
@@ -563,6 +567,8 @@ export default function LeftBar({ user }: LeftBarProps) {
                   </svg>
                   Sent Successfully!
                 </div>
+              ) : buttonText ? (
+                buttonText
               ) : friends.length === 0 ? (
                 "Add a Friend to Send Recordings"
               ) : (

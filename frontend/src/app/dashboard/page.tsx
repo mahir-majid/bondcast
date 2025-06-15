@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../components/AuthContext";
 import AuthNavbar from "../components/AuthNavbar";
 import LeftBar from "./components/leftbar";
-import FancyRecording from "./components/fancyRecording";
+import FancyDashboardRecording from "./components/fancyDashboardRecording";
 import { HiTrash } from "react-icons/hi";
 import Masonry from "react-masonry-css";
 
@@ -319,7 +319,7 @@ export default function Dashboard() {
                         <p className="text-sm font-semibold text-purple-700">@{recording.sender.username}</p>
                       </div>
                     </div>
-                    <FancyRecording 
+                    <FancyDashboardRecording 
                       recordingId={recording.id}
                       sender={recording.sender}
                       showSender={false}
@@ -327,7 +327,7 @@ export default function Dashboard() {
                       className="w-full"
                       onPlay={() => markRecordingAsSeen(recording.id)}
                     />
-                    <p className="text-sm font-semibold text-black mt-2">
+                    <p className="text-sm font-semibold text-black mt-4">
                       {formatDateTime(recording.created_at)}
                     </p>
                   </div>

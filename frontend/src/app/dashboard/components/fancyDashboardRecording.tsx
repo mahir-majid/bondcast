@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { HiRefresh } from 'react-icons/hi';
 
-interface FancyRecordingProps {
+interface FancyDashboardRecordingProps {
   recordingId?: number;
   audioSrc?: string;
   sender?: {
@@ -17,7 +17,7 @@ interface FancyRecordingProps {
   onPlay?: () => void;
 }
 
-export default function FancyRecording({ recordingId, audioSrc, sender, title, showSender = false, className = '', onPlay }: FancyRecordingProps) {
+export default function FancyDashboardRecording({ recordingId, audioSrc, sender, title, showSender = false, className = '', onPlay }: FancyDashboardRecordingProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -152,9 +152,9 @@ export default function FancyRecording({ recordingId, audioSrc, sender, title, s
 
           <button
             onClick={restart}
-            disabled={isLoading || (!audioUrl && !audioSrc)}
+            disabled={isLoading || !audioUrl}
             className={`w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center hover:from-amber-600 hover:to-orange-500 transition-all duration-200 hover:shadow-[0_0_15px_rgba(251,191,36,0.5)] active:scale-95 cursor-pointer ${
-              (isLoading || (!audioUrl && !audioSrc)) ? 'opacity-50 cursor-not-allowed' : ''
+              (isLoading || !audioUrl) ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
             <HiRefresh className="w-6 h-6 text-white" />
