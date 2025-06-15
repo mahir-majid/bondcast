@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { HiMail, HiArrowLeft } from "react-icons/hi";
 import Chat from "../../components/Chat";
-import FancyRecording from "./fancyDashboardRecording";
 import FancySendRecording from "./fancySendRecording";
 
 interface Friend {
