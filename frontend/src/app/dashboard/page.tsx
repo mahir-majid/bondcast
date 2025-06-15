@@ -25,7 +25,7 @@ interface Recording {
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [viewMode, setViewMode] = useState<'new' | 'seen'>('new');
+  const [viewMode, setViewMode] = useState<'new' | 'seen' | 'your'>('new');
   const [isLoading, setIsLoading] = useState(true);
   const baseURL = process.env.NEXT_PUBLIC_URL;
 
@@ -224,7 +224,12 @@ export default function Dashboard() {
   };
 
   const sortedRecordings = recordings
-    .filter(recording => viewMode === 'new' ? !recording.seen : recording.seen)
+    .filter(recording => {
+      if (viewMode === 'new') return !recording.seen;
+      if (viewMode === 'seen') return recording.seen && user && recording.sender.id !== user.id;
+      if (viewMode === 'your' && user) return recording.sender.id === user.id;
+      return true;
+    })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   if (authLoading) {
@@ -264,7 +269,9 @@ export default function Dashboard() {
             <div className="bg-indigo-200/80 backdrop-blur-md rounded-full flex items-center gap-1 relative border border-indigo-300/50 h-[40px]">
               <div 
                 className={`absolute h-full bg-indigo-600 rounded-full transition-all duration-300 ease-in-out ${
-                  viewMode === 'new' ? 'left-0 w-[135px]' : 'left-[135px] w-[60px]'
+                  viewMode === 'new' ? 'left-0 w-[55px]' : 
+                  viewMode === 'seen' ? 'left-[55px] w-[61px]' : 
+                  'left-[120px] w-[135px]'
                 }`}
               />
               <button
@@ -273,7 +280,7 @@ export default function Dashboard() {
                   viewMode === 'new' ? 'text-white' : 'text-indigo-900 hover:bg-indigo-300/50'
                 }`}
               >
-                New Recordings
+                New
               </button>
               <button
                 onClick={() => setViewMode('seen')}
@@ -282,6 +289,14 @@ export default function Dashboard() {
                 }`}
               >
                 Seen
+              </button>
+              <button
+                onClick={() => setViewMode('your')}
+                className={`relative cursor-pointer px-3 py-2 rounded-full text-sm font-semibold transition-all duration-200 h-full flex items-center ${
+                  viewMode === 'your' ? 'text-white' : 'text-indigo-900 hover:bg-indigo-300/50'
+                }`}
+              >
+                Your Recordings
               </button>
             </div>
           </div>
@@ -299,10 +314,10 @@ export default function Dashboard() {
               >
                 {sortedRecordings.map((recording) => (
                   <div key={recording.id} className="bg-purple-200/90 backdrop-blur-md rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-purple-300/50 transition-all duration-200 relative">
-                    {viewMode === 'seen' && (
+                    {(viewMode === 'seen' || viewMode === 'your') && (
                       <button
                         onClick={() => deleteRecording(recording.id)}
-                        className="cursor-pointer absolute top-4 right-4 text-red-800 hover:text-red-700 transition-colors duration-200"
+                        className="cursor-pointer absolute top-6 right-4 text-red-800 hover:text-red-700 transition-colors duration-200"
                         title="Delete recording"
                       >
                         <HiTrash size={20} />
