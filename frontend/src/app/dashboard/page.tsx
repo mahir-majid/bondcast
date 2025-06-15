@@ -21,10 +21,50 @@ interface Recording {
 }
 
 export default function Dashboard() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [viewMode, setViewMode] = useState<'new' | 'seen'>('new');
+  const [isLoading, setIsLoading] = useState(true);
   const baseURL = process.env.NEXT_PUBLIC_URL;
+
+  useEffect(() => {
+    const generateInitialGreeting = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (!token) return;
+
+        // Get current time in user's timezone
+        const now = new Date();
+        const timeContext = {
+          timestamp: now.toISOString(),
+          hour: now.getHours(),
+          minute: now.getMinutes(),
+          weekday: now.toLocaleDateString('en-US', { weekday: 'long' }),
+          isWeekend: [0, 6].includes(now.getDay()),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        const response = await fetch('/api/groq/generate-greeting', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(timeContext)
+        });
+
+        if (!response.ok) {
+          console.error('Failed to generate greeting');
+        }
+      } catch (error) {
+        console.error('Error generating greeting:', error);
+      }
+    };
+
+    if (user) {
+      generateInitialGreeting();
+    }
+  }, [user]);
 
   const markRecordingAsSeen = async (recordingId: number) => {
     const token = localStorage.getItem("accessToken");
@@ -98,9 +138,13 @@ export default function Dashboard() {
             return dateB.getTime() - dateA.getTime();
           });
           setRecordings(sortedRecordings);
+          setIsLoading(false); // Set loading to false after successful fetch
+        } else {
+          setIsLoading(false); // Set loading to false if response is not ok
         }
       } catch (error) {
         console.error('Error fetching recordings:', error);
+        setIsLoading(false); // Set loading to false on error
       }
     };
 
@@ -133,16 +177,29 @@ export default function Dashboard() {
     if (date.toDateString() === yesterday.toDateString()) {
       return `Sent Yesterday at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     }
-    // Otherwise show full date and time
-    return "Sent on " + date.toLocaleString();
+    // Check if it's this year
+    if (date.getFullYear() === now.getFullYear()) {
+      return `Sent on ${date.toLocaleDateString([], { month: 'long', day: 'numeric' })} at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    }
+    // For older years, include the year
+    return `Sent on ${date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })} at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
   };
 
   const filteredRecordings = recordings.filter(recording => 
     viewMode === 'new' ? !recording.seen : recording.seen
   );
 
-  if (loading) {
-    return <div>Loading...</div>;
+  if (authLoading) {
+    return (
+      <div className="h-screen flex flex-col bg-gradient-to-br from-teal-200 via-blue-400 to-indigo-700">
+        <div className="z-1">
+          <AuthNavbar />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -156,7 +213,9 @@ export default function Dashboard() {
       </div>
 
       <main className="flex flex-1 w-full h-[calc(100vh-64px)]">
-        <LeftBar user={user} />
+        <LeftBar 
+          user={user} 
+        />
 
         <section className="flex-1 p-6 max-w-full h-full overflow-y-auto">
           <h1 className="mt-[0px] text-3xl font-extrabold drop-shadow-2xl ml-10 text-black">
@@ -189,42 +248,48 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-[-22px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {filteredRecordings.map((recording) => (
-              <div key={recording.id} className="bg-purple-200/90 backdrop-blur-md rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-purple-300/50 transition-all duration-200 relative">
-                {viewMode === 'seen' && (
-                  <button
-                    onClick={() => deleteRecording(recording.id)}
-                    className="cursor-pointer absolute top-4 right-4 text-red-800 hover:text-red-700 transition-colors duration-200"
-                    title="Delete recording"
-                  >
-                    <HiTrash size={20} />
-                  </button>
-                )}
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-purple-700 flex items-center justify-center text-lg font-bold text-white">
-                    {recording.sender.firstname[0]}{recording.sender.lastname[0]}
+          {isLoading ? (
+            <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="mt-[-22px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+              {filteredRecordings.map((recording) => (
+                <div key={recording.id} className="bg-purple-200/90 backdrop-blur-md rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-purple-300/50 transition-all duration-200 relative">
+                  {viewMode === 'seen' && (
+                    <button
+                      onClick={() => deleteRecording(recording.id)}
+                      className="cursor-pointer absolute top-4 right-4 text-red-800 hover:text-red-700 transition-colors duration-200"
+                      title="Delete recording"
+                    >
+                      <HiTrash size={20} />
+                    </button>
+                  )}
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-purple-700 flex items-center justify-center text-lg font-bold text-white">
+                      {recording.sender.firstname[0]}{recording.sender.lastname[0]}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-purple-900">
+                        {recording.sender.firstname} {recording.sender.lastname}
+                      </h3>
+                      <p className="text-sm font-semibold text-purple-700">@{recording.sender.username}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-purple-900">
-                      {recording.sender.firstname} {recording.sender.lastname}
-                    </h3>
-                    <p className="text-sm font-semibold text-purple-700">@{recording.sender.username}</p>
-                  </div>
+                  <FancyRecording 
+                    recordingId={recording.id}
+                    sender={recording.sender}
+                    showSender={false}
+                    className="w-full"
+                    onPlay={() => markRecordingAsSeen(recording.id)}
+                  />
+                  <p className="text-sm font-semibold text-black mt-2">
+                    {formatDateTime(recording.created_at)}
+                  </p>
                 </div>
-                <FancyRecording 
-                  audioSrc={`data:audio/webm;base64,${recording.audio_data}`}
-                  sender={recording.sender}
-                  showSender={false}
-                  className="w-full"
-                  onPlay={() => markRecordingAsSeen(recording.id)}
-                />
-                <p className="text-sm font-semibold text-black mt-2">
-                  {formatDateTime(recording.created_at)}
-                </p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

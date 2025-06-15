@@ -68,7 +68,10 @@ export default function LeftBar({ user }: LeftBarProps) {
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<number[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -79,60 +82,77 @@ export default function LeftBar({ user }: LeftBarProps) {
     };
   }, []);
 
-  const connectToFriendRequests = () => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (!user) return;
 
-    // Create new WebSocket connection with username
-    const socket = new WebSocket(`${websocketURL}/ws/friend-requests/?username=${user.username}`);
+    console.log('[LeftBar] User detected, setting loading to true...');
+    setIsLoading(true);
+
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      console.log('[LeftBar] No access token found');
+      setIsLoading(false);
+      return;
+    }
+
+    const socket = new WebSocket(`${websocketURL}/ws/friend-requests/?username=${user.username}&token=${token}`);
+    wsRef.current = socket;
+
+    console.log('[LeftBar] Connecting WebSocket...');
 
     socket.onopen = () => {
-      // console.log('Connected to friend requests WebSocket');
-      // Send a proper JSON message
+      console.log('[LeftBar] WebSocket open, sending ping...');
       socket.send(JSON.stringify({ type: 'ping' }));
     };
 
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        // console.log('Friend Requests:', data.friend_requests);
-        // console.log('Friends:', data.user_friends);
+        console.log('[LeftBar] Received WebSocket message:', data);
         
         if (data && data.friend_requests && data.user_friends) {
+          console.log('[LeftBar] Setting friends and friend requests, updating loading state...');
           setFriends(data.user_friends);
           setFriendRequests(data.friend_requests);
+          setIsLoading(false);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          console.log('[LeftBar] Loading state updated to false');
         }
       } catch (error) {
-        console.log('Error parsing message:', error);
+        console.log('[LeftBar] Error parsing message:', error);
+        setFriends([]);
+        setFriendRequests([]);
+        setIsLoading(false);
+        console.log('[LeftBar] Loading state updated to false after error');
       }
     };
 
     socket.onerror = (error) => {
-      console.log('WebSocket error:', error);
+      console.log('[LeftBar] WebSocket error:', error);
       setFriends([]);
       setFriendRequests([]);
+      setIsLoading(false);
+      console.log('[LeftBar] Loading state updated to false after WebSocket error');
     };
 
     socket.onclose = (event) => {
-      console.log('WebSocket closed with code:', event.code, 'reason:', event.reason);
+      console.log('[LeftBar] WebSocket closed with code:', event.code, 'reason:', event.reason);
       setFriends([]);
       setFriendRequests([]);
+      setIsLoading(false);
+      console.log('[LeftBar] Loading state updated to false after WebSocket close');
     };
 
-    // Store socket reference
-    wsRef.current = socket;
-  };
+    timeoutRef.current = setTimeout(() => {
+      console.log('[LeftBar] Safety timeout triggered, forcing loading to false');
+      setIsLoading(false);
+    }, 3000);
 
-  useEffect(() => {
-    if (user) {
-      // Add small delay before connecting
-      setTimeout(() => {
-        connectToFriendRequests();
-      }, 1000);
-    }
-
-    // Cleanup on component unmount
     return () => {
-      if (wsRef.current) {
+      console.log('[LeftBar] Cleanup: clearing timeout and closing WebSocket');
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.close();
       }
     };
@@ -291,6 +311,9 @@ export default function LeftBar({ user }: LeftBarProps) {
     }
 
     try {
+      // Show loading state immediately
+      setShowSuccess(true);
+      
       // Create a FormData object to send the audio file
       const formData = new FormData();
       
@@ -313,6 +336,7 @@ export default function LeftBar({ user }: LeftBarProps) {
         formData.append('to_users[]', id.toString());
       });
 
+      // Upload the recording
       const uploadResponse = await fetch(`${baseURL}/api/recordings/upload/`, {
         method: 'POST',
         headers: {
@@ -321,50 +345,48 @@ export default function LeftBar({ user }: LeftBarProps) {
         body: formData,
       });
 
-      if (uploadResponse.ok) {
-        // Show success message
-        setShowSuccess(true);
-        
-        // Fetch the updated recordings immediately
-        const recordingsResponse = await fetch(`${baseURL}/api/recordings/get/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (recordingsResponse.ok) {
-          const data = await recordingsResponse.json();
-          // Sort recordings by created_at in descending order (newest first)
-          const sortedRecordings = [...data].sort((a, b) => {
-            const dateA = new Date(a.created_at);
-            const dateB = new Date(b.created_at);
-            return dateB.getTime() - dateA.getTime();
-          });
-          // Update the recordings state in the parent component
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('recordingsUpdated', { 
-              detail: { recordings: sortedRecordings }
-            }));
-          }
-        }
-        
-        // Clear the recording and reset state after a delay
-        setTimeout(() => {
-          setRecordingUrl(null);
-          setSelectedFriendIds([]);
-          setLeftDashBarState("listFriends");
-          setShowSuccess(false);
-        }, 1200);
-        
-        // console.log("Successfully sent recording!")
-      } else {
+      if (!uploadResponse.ok) {
         const errorData = await uploadResponse.json();
-        console.error('Failed to upload recording:', errorData);
-        alert(`Failed to send recording: ${errorData.error || 'Unknown error'}`);
+        throw new Error(errorData.error || 'Failed to upload recording');
       }
+
+      // Show success message immediately
+      
+      // Fetch updated recordings in the background
+      fetch(`${baseURL}/api/recordings/get/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      .then(recordingsResponse => recordingsResponse.json())
+      .then(data => {
+        // Sort recordings by created_at in descending order (newest first)
+        const sortedRecordings = [...data].sort((a, b) => {
+          const dateA = new Date(a.created_at);
+          const dateB = new Date(b.created_at);
+          return dateB.getTime() - dateA.getTime();
+        });
+        // Update the recordings state in the parent component
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('recordingsUpdated', { 
+            detail: { recordings: sortedRecordings }
+          }));
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching updated recordings:', error);
+      });
+      
+      // Clear the recording and reset state after a delay
+      setTimeout(() => {
+        setRecordingUrl(null);
+        setSelectedFriendIds([]);
+        setLeftDashBarState("listFriends");
+        setShowSuccess(false);
+      }, 1200);
+      
     } catch (error) {
       console.error('Error sending recording:', error);
-      // Show error to user
       alert('Error sending recording. Please try again.');
     }
   };
@@ -376,6 +398,12 @@ export default function LeftBar({ user }: LeftBarProps) {
 
   return (
     <aside className="relative w-96 bg-gradient-to-b from-blue-400 via-blue-500 to-blue-600 bg-opacity-90 rounded-xl p-6 flex flex-col gap-6 text-blue-900 shadow-lg">
+      {isLoading ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-extrabold drop-shadow-2xl text-black">
           {leftDashBarState === "listFriends" ? "Friends" : 
@@ -467,6 +495,11 @@ export default function LeftBar({ user }: LeftBarProps) {
               llmMode="user_called" 
               onRecordingComplete={handleRecordingComplete}
             />
+                {isLoading && (
+                  <div className="mt-4 flex items-center justify-center">
+                    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                  </div>
+                )}
           </div>
 
           <div className="flex flex-col gap-3 mt-[0] max-h-[calc(100vh-325px)] overflow-y-auto custom-scrollbar pr-4">
@@ -609,6 +642,8 @@ export default function LeftBar({ user }: LeftBarProps) {
             </div>
           )}
         </div>
+          )}
+        </>
       )}
     </aside>
   );

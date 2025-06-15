@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 import datetime
 from datetime import date
 from .assembly_stt import AssemblySTT
+from django.core.cache import cache
 
 executor = ThreadPoolExecutor(max_workers=2)  # Put globally
 
@@ -105,28 +106,17 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.tts_llm_task = None
         self.tts_stream_task = None
 
-        # Contextual History
-        call_datetime = datetime.datetime.fromtimestamp(self.start_call_time)
-        now = datetime.datetime.now()
-        time_of_day = ["late night", "morning", "afternoon", "evening"][
-            0 if call_datetime.hour < 5 or call_datetime.hour >= 22
-            else 1 if call_datetime.hour < 12
-            else 2 if call_datetime.hour < 17
-            else 3
-        ]
-        
-        self.contextual_history = " ".join(filter(None, [
-            f"You are on a call with {self.firstname}, age {self.user_age}, on {call_datetime.strftime('%A')} at {call_datetime.strftime('%I:%M %p')} ({time_of_day}).",
-            f"It's {self.firstname}'s birthday today on {self.user.dob.month} {self.user.dob.day}." if (user.dob.month == now.month and user.dob.day == now.day) else None,
-            "It's Christmas Day." if (now.month == 12 and now.day == 25) else None,
-            "It's New Year's Day." if (now.month == 1 and now.day == 1) else None,
-        ]))
+        # Get greeting and contextual history from cache
+        cache_key = f'user_{self.user_id}_greeting'
+        context_key = f'user_{self.user_id}_context'
+        self.bondi_greeting = cache.get(cache_key) or "Hello, how are you doing today?"
+        self.conversation_context = cache.get(context_key) or ""
 
-        logger.info(f"Contextual History: {self.contextual_history}")
+        logger.info(f"Contextual History: {self.conversation_context}")
 
         # Greet the User
         self.bondi_llm_triggered = True
-        await self._stream_tts("Hello, how are you doing today?")
+        await self._stream_tts(self.bondi_greeting)
 
         # logger.info(f"WS connected for user: {self.firstname}")
 
@@ -304,23 +294,11 @@ class SpeechConsumer(AsyncWebsocketConsumer):
 
             logger.info(f"Entered TTS LLM Processing")
 
-            if response_type == "first-time":
-                llm_tts_system_context = (
-                    f"Your name is Bondi and you are on a call with {self.firstname} who just called you. "
-                    f"Here's contextual history: {self.contextual_history}"
-                )
-
-                llm_tts_input = (
-                    f"Your name is Bondi and you are on  a call with {self.firstname} who just called you. "
-                    f"Spark a conversation with {self.firstname} and ask them a question. "
-                    f"ONLY say your casual call opener and your question. Nothing Else"
-                 
-                )
-
-            elif response_type == "normal":
+            if response_type == "normal":
                 llm_tts_system_context = (
                     f"Your name is Bondi, and you are on a call with {self.firstname}, who is {self.user_age} years old. "
                     f"Your job is to reply to {self.firstname} based on the last thing you said and what {self.firstname} just said. "
+                    "Don't bring up details that you don't know for a hundred percent certainty."
                     f"Talk very casually and be entertaining. "
 
                     f"Respond in a way that shows you're *deeply listening*. "
@@ -333,7 +311,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     "- Never say \"Haha\" in your answers"
 
                     f"Here's the full conversation so far:\n{self.conversation_history.strip()}"
-                    f"Here's contextual history about {self.firstname}: {self.contextual_history}"
+                    f"Here's contextual history about {self.firstname}: {self.conversation_context}"
                 )
 
                 llm_tts_input = (
@@ -341,6 +319,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     f"The last thing you (Bondi) said was: \"{self.agent_last_response}\" "
                     "Reply warmly and casually with 1–2 sentences that reflect what they said and ask a thoughtful follow-up question. "
                     "Make it feel like a real back-and-forth between friends and keep it casual, entertaining, and playful. "
+                    "Don't bring up details that you don't know for a hundred percent certainty."
                     "Do not explain anything. If you respond, say only the reply. Nothing else."
                 )
             

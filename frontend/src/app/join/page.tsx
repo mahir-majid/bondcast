@@ -21,14 +21,34 @@ export default function Join() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
-  const [sentCode, setSentCode] = useState("");
 
   const baseURL = process.env.NEXT_PUBLIC_URL;
 
   const sendVerificationCode = async (email: string) => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setSentCode(code);
-    alert(`Verification code sent to ${email}: ${code}`);
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${baseURL}/api/users/send-verification-code/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send verification code');
+      }
+
+      // Store the email in state for verification
+      setForm(prev => ({ ...prev, email }));
+      setStep("verifyCode");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to send verification code. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,19 +85,33 @@ export default function Join() {
     if (!valid) return;
 
     await sendVerificationCode(form.email);
-    setStep("verifyCode");
   };
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (verificationCode !== sentCode) {
-      setErrors({ verificationCode: "Incorrect verification code" });
-      return;
-    }
     setErrors({});
     setIsLoading(true);
 
     try {
+      // First verify the code with the backend
+      const verifyResponse = await fetch(`${baseURL}/api/users/check-verification-code/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          code: verificationCode
+        }),
+      });
+
+      const verifyData = await verifyResponse.json();
+      
+      if (!verifyResponse.ok) {
+        setErrors({ verificationCode: verifyData.error || "Invalid verification code" });
+        setIsLoading(false);
+        return;
+      }
+
+      // If verification successful, proceed with registration
       const res = await fetch(`${baseURL}/api/users/register/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,12 +129,11 @@ export default function Join() {
       }
 
       await login(form.username, form.password);
-
       setStep("success");
-
       setTimeout(() => router.push("/dashboard"), 2000);
-    } catch {
-      alert("Registration failed. Try again.");
+    } catch (error: unknown) {
+      console.error('Registration error:', error);
+      setErrors({ verificationCode: "Registration failed. Please try again." });
     } finally {
       setIsLoading(false);
     }

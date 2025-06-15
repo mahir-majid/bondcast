@@ -108,6 +108,35 @@ class GetRecordingsView(APIView):
             # Combine both querysets
             all_recordings = recordings.union(received_recordings)
             
+            recordings_data = []
+            for recording in all_recordings:
+                recordings_data.append({
+                    'id': recording.id,
+                    'sender': {
+                        'id': recording.sender.id,
+                        'username': recording.sender.username,
+                        'firstname': recording.sender.firstname,
+                        'lastname': recording.sender.lastname
+                    },
+                    'created_at': recording.created_at,
+                    'seen': recording.seen
+                })
+            
+            return Response(recordings_data)
+        except Exception as e:
+            print(f"Error getting recordings: {str(e)}")
+            return Response({"error": str(e)}, status=500)
+
+class GetRecordingAudioView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, recording_id):
+        try:
+            recording = AudioClip.objects.get(id=recording_id)
+            # Check if user is either sender or recipient
+            if request.user != recording.sender and request.user not in recording.recipients.all():
+                return Response({'error': 'Not authorized to access this recording'}, status=403)
+
             # Initialize S3 client
             s3 = boto3.client(
                 's3',
@@ -117,35 +146,23 @@ class GetRecordingsView(APIView):
             )
             
             bucket = os.getenv("AWS_LOCAL_STORAGE_BUCKET_NAME")
+            key = recording.s3_url.split(f"https://{bucket}.s3.amazonaws.com/")[1]
             
-            recordings_data = []
-            for recording in all_recordings:
-                # Extract the key from the S3 URL
-                key = recording.s3_url.split(f"https://{bucket}.s3.amazonaws.com/")[1]
-                
-                # Get the file from S3
-                response = s3.get_object(Bucket=bucket, Key=key)
-                file_content = response['Body'].read()
-                
-                # Convert the binary data to base64
-                audio_data = base64.b64encode(file_content).decode('utf-8')
-                
-                recordings_data.append({
-                    'id': recording.id,
-                    'sender': {
-                        'id': recording.sender.id,
-                        'username': recording.sender.username,
-                        'firstname': recording.sender.firstname,
-                        'lastname': recording.sender.lastname
-                    },
-                    'audio_data': audio_data,  # Base64 encoded audio data
-                    'created_at': recording.created_at,
-                    'seen': recording.seen
-                })
+            # Generate presigned URL that expires in 1 hour
+            presigned_url = s3.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': bucket,
+                    'Key': key
+                },
+                ExpiresIn=3600
+            )
             
-            return Response(recordings_data)
+            return Response({'audio_url': presigned_url})
+        except AudioClip.DoesNotExist:
+            return Response({'error': 'Recording not found'}, status=404)
         except Exception as e:
-            print(f"Error getting recordings: {str(e)}")
+            print(f"Error getting recording audio: {str(e)}")
             return Response({"error": str(e)}, status=500)
 
 class MarkAsSeenView(APIView):
