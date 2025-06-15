@@ -56,22 +56,30 @@ class LoginOrRegisterJWTView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        username = request.data.get("username", "").strip()
+        username_or_email = request.data.get("username", "").strip()
         password = request.data.get("password", "")
 
         # 1. Both fields must be provided
-        if not username or not password:
+        if not username_or_email or not password:
             return Response(
-                {"error": "Username and password are required"},
+                {"error": "Username/Email and password are required"},
             )
 
-        # 2. Look up the user by username
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            return Response(
-                {"error": "Username not found"},
-            )
+        # 2. Look up the user by username or email
+        if '@' in username_or_email:
+            try:
+                user = User.objects.get(email=username_or_email)
+            except:
+                return Response(
+                    {"error": "Email not found"},
+                )
+        else:
+            try:
+                user = User.objects.get(username=username_or_email)
+            except:
+                return Response(
+                    {"error": "Username not found"},
+                )
 
         # 3. Check the password
         if not user.check_password(password):

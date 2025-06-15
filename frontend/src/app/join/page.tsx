@@ -144,7 +144,7 @@ export default function Join() {
       <Navbar />
 
       <main className="flex flex-col flex-1 items-center justify-center px-6 sm:px-12 text-center gap-8 max-w-3xl mx-auto">
-        <h1 className="text-5xl font-extrabold drop-shadow-lg">Dive In</h1>
+        <h1 className="text-5xl font-extrabold drop-shadow-lg">Sign Up</h1>
 
         {step === "form" && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full bg-purple-950/60 backdrop-blur-sm p-8 rounded-xl shadow-xl border border-white/20">

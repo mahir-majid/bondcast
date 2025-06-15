@@ -525,18 +525,27 @@ export default function LeftBar({ user }: LeftBarProps) {
       {leftDashBarState === "recording" && recordingUrl && (
         <div className="mt-[-7px] flex flex-col gap-4">
           <div className="p-4 bg-pink-200/90 rounded-lg backdrop-blur-sm border-2 border-transparent hover:border-pink-300/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] transition-all duration-200">
-            <input
-              type="text"
-              value={recordingTitle}
-              onChange={e => setRecordingTitle(e.target.value)}
-              placeholder="Enter a title for your recording"
-              className="w-full mb-4 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
-              disabled={showSuccess}
-            />
-            <FancyRecording 
-              audioSrc={recordingUrl}
-              className="w-full"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={recordingTitle}
+                onChange={e => setRecordingTitle(e.target.value)}
+                placeholder="Enter a title for your recording"
+                className="w-full mb-1 px-3 py-2 border-2 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                disabled={showSuccess}
+                maxLength={150}
+              />
+              <div className="text-right text-sm text-gray-600 mb-4">
+                {recordingTitle.length}/150 characters
+              </div>
+            </div>
+            <div className="mt-[-15px]">
+              <FancyRecording 
+                audioSrc={recordingUrl}
+                className="w-full"
+              />
+            </div>
+            
           </div>
 
           <div className="flex flex-col gap-4">

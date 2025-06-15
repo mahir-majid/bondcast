@@ -6,6 +6,7 @@ import AuthNavbar from "../components/AuthNavbar";
 import LeftBar from "./components/leftbar";
 import FancyRecording from "./components/fancyRecording";
 import { HiTrash } from "react-icons/hi";
+import Masonry from "react-masonry-css";
 
 interface Recording {
   id: number;
@@ -96,6 +97,9 @@ export default function Dashboard() {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
 
+    // Optimistically remove the recording from UI
+    setRecordings(prev => prev.filter(rec => rec.id !== recordingId));
+
     try {
       const response = await fetch(`${baseURL}/api/recordings/delete/${recordingId}/`, {
         method: 'DELETE',
@@ -104,14 +108,47 @@ export default function Dashboard() {
         },
       });
 
-      if (response.ok) {
-        // Remove the recording from the local state
-        setRecordings(prev => prev.filter(rec => rec.id !== recordingId));
-      } else {
-        console.error('Failed to delete recording');
+      if (!response.ok) {
+        // If the deletion fails, revert the UI change
+        const errorData = await response.json();
+        console.error('Failed to delete recording:', errorData);
+        // Re-fetch recordings to restore the correct state
+        const recordingsResponse = await fetch(`${baseURL}/api/recordings/get/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (recordingsResponse.ok) {
+          const data = await recordingsResponse.json();
+          const sortedRecordings = [...data].sort((a: Recording, b: Recording) => {
+            const dateA = new Date(a.created_at);
+            const dateB = new Date(b.created_at);
+            return dateB.getTime() - dateA.getTime();
+          });
+          setRecordings(sortedRecordings);
+        }
       }
     } catch (error) {
       console.error('Error deleting recording:', error);
+      // Re-fetch recordings to restore the correct state
+      try {
+        const recordingsResponse = await fetch(`${baseURL}/api/recordings/get/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (recordingsResponse.ok) {
+          const data = await recordingsResponse.json();
+          const sortedRecordings = [...data].sort((a: Recording, b: Recording) => {
+            const dateA = new Date(a.created_at);
+            const dateB = new Date(b.created_at);
+            return dateB.getTime() - dateA.getTime();
+          });
+          setRecordings(sortedRecordings);
+        }
+      } catch (fetchError) {
+        console.error('Error restoring recordings:', fetchError);
+      }
     }
   };
 
@@ -186,9 +223,9 @@ export default function Dashboard() {
     return `Sent on ${date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })} at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
   };
 
-  const filteredRecordings = recordings.filter(recording => 
-    viewMode === 'new' ? !recording.seen : recording.seen
-  );
+  const sortedRecordings = recordings
+    .filter(recording => viewMode === 'new' ? !recording.seen : recording.seen)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   if (authLoading) {
     return (
@@ -249,49 +286,55 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <div className="mt-[-22px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-              {filteredRecordings.map((recording) => (
-                <div key={recording.id} className="bg-purple-200/90 backdrop-blur-md rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-purple-300/50 transition-all duration-200 relative">
-                  {viewMode === 'seen' && (
-                    <button
-                      onClick={() => deleteRecording(recording.id)}
-                      className="cursor-pointer absolute top-4 right-4 text-red-800 hover:text-red-700 transition-colors duration-200"
-                      title="Delete recording"
-                    >
-                      <HiTrash size={20} />
-                    </button>
-                  )}
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-purple-700 flex items-center justify-center text-lg font-bold text-white">
-                      {recording.sender.firstname[0]}{recording.sender.lastname[0]}
+          <div className="mt-[-22px]">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+                <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <Masonry
+                breakpointCols={{ default: 3, 1024: 2, 640: 1 }}
+                className="flex w-full gap-6 p-6"
+                columnClassName="space-y-6"
+              >
+                {sortedRecordings.map((recording) => (
+                  <div key={recording.id} className="bg-purple-200/90 backdrop-blur-md rounded-lg p-6 shadow-lg border-2 border-transparent hover:border-purple-300/50 transition-all duration-200 relative">
+                    {viewMode === 'seen' && (
+                      <button
+                        onClick={() => deleteRecording(recording.id)}
+                        className="cursor-pointer absolute top-4 right-4 text-red-800 hover:text-red-700 transition-colors duration-200"
+                        title="Delete recording"
+                      >
+                        <HiTrash size={20} />
+                      </button>
+                    )}
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-full bg-purple-700 flex items-center justify-center text-lg font-bold text-white">
+                        {recording.sender.firstname[0]}{recording.sender.lastname[0]}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-purple-900">
+                          {recording.sender.firstname} {recording.sender.lastname}
+                        </h3>
+                        <p className="text-sm font-semibold text-purple-700">@{recording.sender.username}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-purple-900">
-                        {recording.sender.firstname} {recording.sender.lastname}
-                      </h3>
-                      <p className="text-sm font-semibold text-purple-700">@{recording.sender.username}</p>
-                    </div>
+                    <FancyRecording 
+                      recordingId={recording.id}
+                      sender={recording.sender}
+                      showSender={false}
+                      title={recording.title}
+                      className="w-full"
+                      onPlay={() => markRecordingAsSeen(recording.id)}
+                    />
+                    <p className="text-sm font-semibold text-black mt-2">
+                      {formatDateTime(recording.created_at)}
+                    </p>
                   </div>
-                  <FancyRecording 
-                    recordingId={recording.id}
-                    sender={recording.sender}
-                    showSender={false}
-                    title={recording.title}
-                    className="w-full"
-                    onPlay={() => markRecordingAsSeen(recording.id)}
-                  />
-                  <p className="text-sm font-semibold text-black mt-2">
-                    {formatDateTime(recording.created_at)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </Masonry>
+            )}
+          </div>
         </section>
       </main>
     </div>

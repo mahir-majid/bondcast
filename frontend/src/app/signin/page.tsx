@@ -42,6 +42,8 @@ export default function SignIn() {
         setError("Incorrect password.");
       } else if (msg.includes("username not found")) {
         setError("Username not found.");
+      } else if (msg.includes("email not found")) {
+        setError("Email not found.");
       } else if (msg.includes("required")) {
         setError("Username and password are required.");
       } else {
@@ -278,7 +280,7 @@ export default function SignIn() {
           <input
             type="text"
             name="username"
-            placeholder="Username"
+            placeholder="Username or Email"
             value={form.username}
             onChange={handleChange}
             required

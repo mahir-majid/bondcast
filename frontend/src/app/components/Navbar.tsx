@@ -15,7 +15,7 @@ export default function Navbar() {
 
       {/* Links shown when NOT signed in */}
       <nav className="space-x-6 sm:space-x-10 text-xl sm:text-2xl font-semibold text-amber-800">
-        <Link
+        {/* <Link
           href="/signin"
           className="hover:underline hover:text-amber-900 transition-colors"
         >
@@ -26,7 +26,7 @@ export default function Navbar() {
           className="hover:underline hover:text-amber-900 transition-colors"
         >
           Join
-        </Link>
+        </Link> */}
       </nav>
     </header>
   );

@@ -14,7 +14,7 @@ class AudioClip(models.Model):
     )
     recipients = models.ManyToManyField(User, related_name='received_recordings')
     s3_url = models.URLField()
-    title = models.CharField(max_length=100, default="Untitled Recording")  # Add title field with default value
+    title = models.CharField(max_length=150, default="Untitled Recording")  # Add title field with default value
     created_at = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=True)
     seen = models.BooleanField(default=False)  # New field to track if recording has been played

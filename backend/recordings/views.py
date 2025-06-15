@@ -81,7 +81,8 @@ class RecordingUploadView(APIView):
                     recipient_clip = AudioClip.objects.create(
                         sender=request.user,
                         s3_url=s3_url,
-                        seen=False  # Recipients' copies are marked as unseen
+                        seen=False,  # Recipients' copies are marked as unseen
+                        title=request.data.get('title', 'Untitled Recording')
                     )
                     recipient_clip.recipients.add(recipient_id)
 
