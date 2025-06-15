@@ -18,6 +18,7 @@ interface Recording {
   audio_data: string;  // Base64 encoded audio data
   created_at: string;
   seen: boolean;
+  title: string;  // Add title field
 }
 
 export default function Dashboard() {
@@ -280,6 +281,7 @@ export default function Dashboard() {
                     recordingId={recording.id}
                     sender={recording.sender}
                     showSender={false}
+                    title={recording.title}
                     className="w-full"
                     onPlay={() => markRecordingAsSeen(recording.id)}
                   />

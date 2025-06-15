@@ -71,7 +71,7 @@ export default function LeftBar({ user }: LeftBarProps) {
   const [isLoading, setIsLoading] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  const [recordingTitle, setRecordingTitle] = useState("");
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -303,15 +303,16 @@ export default function LeftBar({ user }: LeftBarProps) {
 
   const handleSendRecording = async () => {
     if (!recordingUrl) return;
-    
+    if (!recordingTitle.trim()) {
+      alert('Please enter a title for your recording.');
+      return;
+    }
     const token = localStorage.getItem("accessToken");
     if (!token) {
       console.error("No access token found");
       return;
     }
-
     try {
-      // Show loading state immediately
       setShowSuccess(true);
       
       // Create a FormData object to send the audio file
@@ -326,12 +327,11 @@ export default function LeftBar({ user }: LeftBarProps) {
         type: 'audio/webm' // Change to webm since that's what the browser records in
       });
       formData.append('audio', audioFile);
-      
-      // If no friends are selected, send to all friends
+      formData.append('title', recordingTitle.trim());
+      console.log('Recording title being sent:', recordingTitle.trim());
       const recipientsToSend = selectedFriendIds.length === 0 
         ? friends.map(friend => friend.id)
         : selectedFriendIds;
-
       recipientsToSend.forEach(id => {
         formData.append('to_users[]', id.toString());
       });
@@ -351,7 +351,6 @@ export default function LeftBar({ user }: LeftBarProps) {
       }
 
       // Show success message immediately
-      
       // Fetch updated recordings in the background
       fetch(`${baseURL}/api/recordings/get/`, {
         headers: {
@@ -381,10 +380,10 @@ export default function LeftBar({ user }: LeftBarProps) {
       setTimeout(() => {
         setRecordingUrl(null);
         setSelectedFriendIds([]);
+        setRecordingTitle("");
         setLeftDashBarState("listFriends");
         setShowSuccess(false);
       }, 1200);
-      
     } catch (error) {
       console.error('Error sending recording:', error);
       alert('Error sending recording. Please try again.');
@@ -526,7 +525,14 @@ export default function LeftBar({ user }: LeftBarProps) {
       {leftDashBarState === "recording" && recordingUrl && (
         <div className="mt-[-7px] flex flex-col gap-4">
           <div className="p-4 bg-pink-200/90 rounded-lg backdrop-blur-sm border-2 border-transparent hover:border-pink-300/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] transition-all duration-200">
-            <h3 className="text-xl font-semibold mb-4">Your Recording</h3>
+            <input
+              type="text"
+              value={recordingTitle}
+              onChange={e => setRecordingTitle(e.target.value)}
+              placeholder="Enter a title for your recording"
+              className="w-full mb-4 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+              disabled={showSuccess}
+            />
             <FancyRecording 
               audioSrc={recordingUrl}
               className="w-full"

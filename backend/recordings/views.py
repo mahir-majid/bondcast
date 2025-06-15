@@ -13,6 +13,8 @@ from datetime import datetime
 import base64
 from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import render
+import logging
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -68,7 +70,8 @@ class RecordingUploadView(APIView):
             sender_clip = AudioClip.objects.create(
                 sender=request.user,
                 s3_url=s3_url,
-                seen=True  # Sender's copy is marked as seen
+                seen=True,  # Sender's copy is marked as seen
+                title=request.data.get('title', 'Untitled Recording')
             )
             sender_clip.recipients.add(request.user)  # Add sender as recipient
 
@@ -107,6 +110,8 @@ class GetRecordingsView(APIView):
             
             # Combine both querysets
             all_recordings = recordings.union(received_recordings)
+
+            # logger.info(f"All recordings: {all_recordings}")
             
             recordings_data = []
             for recording in all_recordings:
@@ -119,7 +124,8 @@ class GetRecordingsView(APIView):
                         'lastname': recording.sender.lastname
                     },
                     'created_at': recording.created_at,
-                    'seen': recording.seen
+                    'seen': recording.seen,
+                    'title': recording.title  # Include the title field
                 })
             
             return Response(recordings_data)

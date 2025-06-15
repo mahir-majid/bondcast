@@ -39,7 +39,7 @@ export default function AuthNavbar() {
 
           {/* Profile Card */}
           {showProfileCard && (
-            <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl p-6 border border-amber-100">
+            <div className="absolute right-0 mt-3 w-96 bg-white rounded-xl shadow-2xl p-6 border border-amber-100">
               <div className="space-y-4">
                 <div className="text-center">
                   <h3 className="text-2xl font-bold text-gray-800 mb-2">

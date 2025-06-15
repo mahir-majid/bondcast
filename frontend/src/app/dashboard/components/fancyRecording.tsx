@@ -11,12 +11,13 @@ interface FancyRecordingProps {
     lastname: string;
     username: string;
   };
+  title?: string;
   showSender?: boolean;
   className?: string;
   onPlay?: () => void;
 }
 
-export default function FancyRecording({ recordingId, audioSrc, sender, showSender = false, className = '', onPlay }: FancyRecordingProps) {
+export default function FancyRecording({ recordingId, audioSrc, sender, title, showSender = false, className = '', onPlay }: FancyRecordingProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -125,39 +126,41 @@ export default function FancyRecording({ recordingId, audioSrc, sender, showSend
 
   return (
     <div className={`relative group ${className}`}>
-      <div className="flex items-center gap-4">
-        <button
-          onClick={togglePlay}
-          disabled={isLoading}
-          className={`w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center hover:from-amber-600 hover:to-orange-500 transition-all duration-200 hover:shadow-[0_0_15px_rgba(251,191,36,0.5)] active:scale-95 cursor-pointer ${
-            isLoading ? 'opacity-50 cursor-wait' : ''
-          }`}
-        >
-          {isLoading ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : isPlaying ? (
-            <div className="w-5 h-5 bg-white rounded-sm" />
-          ) : (
-            <div className="w-0 h-0 border-t-10 border-t-transparent border-l-16 border-l-white border-b-10 border-b-transparent ml-1" />
-          )}
-        </button>
+      <div className="flex flex-col items-center gap-2">
+        {showSender && sender && (
+          <div className="text-sm text-indigo-300">
+            From: {sender.firstname} {sender.lastname} (@{sender.username})
+          </div>
+        )}
+        <h3 className="text-lg font-semibold text-indigo-900 text-center">{title}</h3>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={togglePlay}
+            disabled={isLoading}
+            className={`w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center hover:from-amber-600 hover:to-orange-500 transition-all duration-200 hover:shadow-[0_0_15px_rgba(251,191,36,0.5)] active:scale-95 cursor-pointer ${
+              isLoading ? 'opacity-50 cursor-wait' : ''
+            }`}
+          >
+            {isLoading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : isPlaying ? (
+              <div className="w-5 h-5 bg-white rounded-sm" />
+            ) : (
+              <div className="w-0 h-0 border-t-10 border-t-transparent border-l-16 border-l-white border-b-10 border-b-transparent ml-1" />
+            )}
+          </button>
 
-        <button
-          onClick={restart}
-          disabled={isLoading || !audioUrl}
-          className={`w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center hover:from-amber-600 hover:to-orange-500 transition-all duration-200 hover:shadow-[0_0_15px_rgba(251,191,36,0.5)] active:scale-95 cursor-pointer ${
-            (isLoading || !audioUrl) ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-        >
-          <HiRefresh className="w-6 h-6 text-white" />
-        </button>
-      </div>
-
-      {showSender && sender && (
-        <div className="mt-2 text-sm text-indigo-300">
-          From: {sender.firstname} {sender.lastname} (@{sender.username})
+          <button
+            onClick={restart}
+            disabled={isLoading || !audioUrl}
+            className={`w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center hover:from-amber-600 hover:to-orange-500 transition-all duration-200 hover:shadow-[0_0_15px_rgba(251,191,36,0.5)] active:scale-95 cursor-pointer ${
+              (isLoading || !audioUrl) ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            <HiRefresh className="w-6 h-6 text-white" />
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -132,7 +132,7 @@ class RefreshJWTView(TokenRefreshView):
                 {"error": "Invalid or expired refresh token"},
                 status=status.HTTP_401_UNAUTHORIZED
             )
-        
+
 class SendVerificationCodeView(APIView):
     permission_classes = [AllowAny]  # Open to unauthenticated users (e.g. sign up flow)
 

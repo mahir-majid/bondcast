@@ -274,49 +274,49 @@ export default function SignIn() {
         {resetStep ? (
           renderResetForm()
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[28rem] bg-purple-950/60 backdrop-blur-sm p-10 rounded-xl shadow-xl border border-white/20">
-            <input
-              type="text"
-              name="username"
-              placeholder="Username"
-              value={form.username}
-              onChange={handleChange}
-              required
-              className="p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white"
-            />
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[28rem] bg-purple-950/60 backdrop-blur-sm p-10 rounded-xl shadow-xl border border-white/20">
+          <input
+            type="text"
+            name="username"
+            placeholder="Username"
+            value={form.username}
+            onChange={handleChange}
+            required
+            className="p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white"
+          />
 
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={form.password}
-              onChange={handleChange}
-              required
-              className="p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white"
-            />
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={handleChange}
+            required
+            className="p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white"
+          />
 
-            <div className="text-left">
+          <div className="text-left">
               <button type="button" onClick={() => setResetStep("request")} className="text-sm text-white/80 hover:underline cursor-pointer">
-                Forgot your password?
-              </button>
-            </div>
-
-            {error && <p className="text-red-200 text-sm text-left">{error}</p>}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 cursor-pointer rounded font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-60"
-            >
-              {isLoading ? "Signing in..." : "Sign In"}
+              Forgot your password?
             </button>
-          </form>
+          </div>
+
+          {error && <p className="text-red-200 text-sm text-left">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 cursor-pointer rounded font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-60"
+          >
+            {isLoading ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
         )}
 
         {!resetStep && (
-          <p className="text-base text-white/80 max-w-xs">
-            Don&apos;t have an account? <a href="/join" className="underline hover:text-white">Sign up here</a>.
-          </p>
+        <p className="text-base text-white/80 max-w-xs">
+          Don&apos;t have an account? <a href="/join" className="underline hover:text-white">Sign up here</a>.
+        </p>
         )}
       </main>
     </div>
