@@ -12,26 +12,13 @@ export default function FancySendRecording({ audioSrc, className = '' }: FancySe
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize audio when URL is loaded
+  // Single useEffect to handle audio initialization and event listeners
   useEffect(() => {
     if (!audioSrc) return;
 
     const audio = new Audio(audioSrc);
     audio.preload = 'auto';
     audioRef.current = audio;
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
-    };
-  }, [audioSrc]);
-
-  // Handle audio events
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
@@ -42,11 +29,15 @@ export default function FancySendRecording({ audioSrc, className = '' }: FancySe
     audio.addEventListener('ended', handleEnded);
 
     return () => {
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', handleEnded);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current.removeEventListener('play', handlePlay);
+        audioRef.current.removeEventListener('pause', handlePause);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
     };
-  }, []);
+  }, [audioSrc]);
 
   const togglePlay = () => {
     if (audioRef.current) {
