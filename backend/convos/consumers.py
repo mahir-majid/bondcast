@@ -64,6 +64,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.llmMode = self.scope['url_route']['kwargs']['llmMode']
         
         self.justCalled = True
+        self.ready_for_streaming = False  # Add this flag
         
         # Get user from database
         user = await self.get_user_by_username(self.username)
@@ -114,9 +115,8 @@ class SpeechConsumer(AsyncWebsocketConsumer):
 
         logger.info(f"Contextual History: {self.conversation_context}")
 
-        # Greet the User
+        # Don't start greeting immediately - wait for ready signal
         self.bondi_llm_triggered = True
-        await self._stream_tts(self.bondi_greeting)
 
         # logger.info(f"WS connected for user: {self.firstname}")
 
@@ -217,7 +217,11 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         if text_data:
             try:
                 data = json.loads(text_data)
-                if data.get("type") == "audio_started":
+                if data.get("type") == "ready_for_streaming":
+                    self.ready_for_streaming = True
+                    # Now start the greeting
+                    await self._stream_tts(self.bondi_greeting)
+                elif data.get("type") == "audio_started":
                     logger.info("Frontend started playing audio")
                     self.streaming_text = True
                 elif data.get("type") == "audio_done":

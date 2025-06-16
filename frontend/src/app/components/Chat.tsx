@@ -12,6 +12,7 @@ interface ChatProps {
 export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
   const { user } = useAuth();
   const [isTalking, setIsTalking] = useState(false);
+  const [isRinging, setIsRinging] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
   const transcriptionContextRef = useRef<AudioContext | null>(null);
   const playbackContextRef = useRef<AudioContext | null>(null);
@@ -19,6 +20,32 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingTTSNodeRef = useRef<AudioWorkletNode | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to play ringtone
+  const playRingtone = () => {
+    if (!ringtoneRef.current) {
+      ringtoneRef.current = new Audio('/ringtone.mp3');
+      ringtoneRef.current.loop = true;
+    }
+    ringtoneRef.current.play();
+  };
+
+  // Function to stop ringtone
+  const stopRingtone = () => {
+    if (ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current.currentTime = 0;
+    }
+    if (ringtoneIntervalRef.current) {
+      clearTimeout(ringtoneIntervalRef.current);
+    }
+  };
+
+  function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 
   /** start / stop mic + websocket */
   const TalkToAI = async () => {
@@ -27,6 +54,12 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
         console.error("No user found");
         return;
       }
+
+      // Set ringing state immediately
+      setIsRinging(true);
+
+      // Start playing ringtone
+      playRingtone();
 
       // Get microphone permission
       const microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -77,16 +110,40 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
         onRecordingComplete?.(url);
       };
 
-      mediaRecorder.start();
+      // Don't start recording yet - we'll start it when ElevenLabs begins speaking
       
       // WebSocket connection with username
       const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}/ws/speech/${user.username}/${llmMode}/`);
       socket.binaryType = "arraybuffer";
 
       // Handles initial connection to the websocket
-      socket.onopen = () => {
-        // console.log("WebSocket connected");
+      socket.onopen = async () => {
+        // Stop ringtone and play beep when connection is established
+        await sleep(1000);
+        stopRingtone();
+        const beep = new Audio('/beep.mp3');
+
+        // Send ready signal to start ElevenLabs streaming
+        socket.send(JSON.stringify({ type: "ready_for_streaming" }));
+        
+        // Change to talking state after beep
+        setIsRinging(false);
         setIsTalking(true);
+
+        // Wait for beep to finish before starting audio processing
+        await new Promise<void>((resolve) => {
+          beep.onended = () => resolve();
+          beep.play();
+        });
+
+        // Only start audio processing after beep is completely done
+        if (workletNodeTTSRef.current) {
+          workletNodeTTSRef.current.connect(playbackContext.destination);
+        }
+        if (recordingTTSNodeRef.current) {
+          recordingTTSNodeRef.current.connect(recordingDestination);
+        }
+        // Connect transcription source and processor
         transcriptionSource.connect(transcriptionProcessor);
         transcriptionProcessor.connect(transcriptionContext.destination);
       };
@@ -114,6 +171,11 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
             
             // Create copies of the buffer before any transfers
             const bufferCopy = e.data.slice(0);
+            
+            // Start recording when we receive the first audio chunk from ElevenLabs
+            if (!mediaRecorderRef.current?.state || mediaRecorderRef.current.state === 'inactive') {
+              mediaRecorderRef.current?.start();
+            }
             
             // Send the PCM data to the worklet
             if (workletNodeTTSRef.current) {
@@ -188,6 +250,7 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
     // Stop function
     const stop = () => {
         // console.log("Stopping audio and WebSocket");
+        stopRingtone();
 
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ type: "audio_cleanup" }));
@@ -211,26 +274,33 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
         }
 
         setIsTalking(false);
+        setIsRinging(false);
       };
 
         stopRef.current = stop;
 
       } catch (err) {
         console.error("TalkToAI error:", err);
+        setIsRinging(false);
       }
     };
 
   // Toggler between starting daily chat and ending it
-  const handleClick = () => (isTalking && stopRef.current ? stopRef.current() : TalkToAI());
+  const handleClick = () => {
+    if (isRinging) return; // Do nothing if ringing
+    if (isTalking && stopRef.current) stopRef.current();
+    else TalkToAI();
+  };
 
   return (
-
     <div className="flex flex-col items-center gap-6 w-full max-w-2xl">
       <button
         onClick={handleClick}
-        className="px-6 py-3 cursor-pointer rounded-lg bg-gradient-to-r from-purple-700 to-purple-900 text-amber-300 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(251,191,36,0.8)] hover:from-purple-600 hover:to-purple-800 hover:text-amber-200 active:scale-95 active:shadow-inner transition-all duration-200"
+        className={`px-6 py-3 cursor-pointer rounded-lg bg-gradient-to-r from-purple-700 to-purple-900 text-amber-300 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(251,191,36,0.8)] hover:from-purple-600 hover:to-purple-800 hover:text-amber-200 active:scale-95 active:shadow-inner transition-all duration-200 ${
+          isRinging ? 'opacity-75 cursor-not-allowed' : ''
+        }`}
       >
-        {isTalking ? "End Call" : "Call Bondi"}
+        {isRinging ? "Ringing..." : isTalking ? "End Call" : "Call Bondi"}
       </button>
     </div>
   );
