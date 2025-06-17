@@ -107,15 +107,17 @@ class SetGreetingView(APIView):
 
         logger.info(f"Bondi contextual history: {bondi_contextual_history}")
 
-        llm_tts_system_context = (
+        greeting_llm_tts_system_context = (
             f"Your name is Bondi and you are on a call with {user.firstname} who just called you. "
-            f"Here's contextual history: {bondi_contextual_history}"
+            f"You are on a call with {user.firstname} on {weekday} in {time_of_day_context} at {hour:02d}:{minute:02d}"
+            + (f" It's {user.firstname}'s birthday today on {dob.month} {dob.day}." if birthday_today else "")
+            + (" It's Christmas Day." if (now.month == 12 and now.day == 25) else "")
+            + (" It's New Year's Day." if (now.month == 1 and now.day == 1) else "")
         )
-        llm_tts_input = (
+        greeting_llm_tts_input = (
             f"Your name is Bondi and you are on a call with {user.firstname} who just called you. "
-            f"Spark a conversation with {user.firstname} and ask them a question. "
-            f"ONLY say your casual call opener and your question. Nothing Else."
-            f"Don't bring up details that you don't know for a hundred percent certainty."
+            f"Spark a conversation with {user.firstname} and only "
+            f"ONLY say a simple casual call opener with a question like a human would during a phone call. Nothing Else."
         )
 
         # Call Groq
@@ -126,8 +128,8 @@ class SetGreetingView(APIView):
         try:
             completion = groq.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": llm_tts_system_context},
-                    {"role": "user", "content": llm_tts_input}
+                    {"role": "system", "content": greeting_llm_tts_system_context},
+                    {"role": "user", "content": greeting_llm_tts_input}
                 ],
                 model="llama-3.1-8b-instant",
                 temperature=0.9,

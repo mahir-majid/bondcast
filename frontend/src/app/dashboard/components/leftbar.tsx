@@ -300,6 +300,14 @@ export default function LeftBar({ user }: LeftBarProps) {
   const handleRecordingComplete = (url: string) => {
     setRecordingUrl(url);
     setLeftDashBarState("recording");
+        
+    // Play beep sound for 0.75 seconds
+    const beep = new Audio('/beep.mp3');
+    beep.play();
+    setTimeout(() => {
+      beep.pause();
+      beep.currentTime = 0;
+    }, 750);
   };
 
   const handleSendRecording = async () => {

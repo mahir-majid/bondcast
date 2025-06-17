@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 # For 16kHz audio, 800 samples = 50ms, 16000 samples = 1000ms
 # Let's use 3200 samples = 200ms to be safe
 CHUNK_SAMPLES = 3200  # 200ms of audio at 16kHz
-SILENCE_THRESHOLD = 0.2  # seconds of silence before processing
+SILENCE_THRESHOLD = 0.3  # seconds of silence before processing
 STREAM_TIMEOUT = 5  # seconds of silence before ending stream
 FIRST_TIMEOUT = 5
 SECOND_TIMEOUT = 5
-MAX_CALL_DURATION_TIME = 120
+MAX_CALL_DURATION_TIME = 180
 
 
 # Initialize Vosk model
@@ -293,24 +293,35 @@ class SpeechConsumer(AsyncWebsocketConsumer):
     async def _process_tts_llm(self, response_type: str) -> None:
         try:
             self.bondi_llm_triggered = True
+            call_duration = time.time() - self.start_call_time
             llm_tts_system_context = ""
             llm_tts_input = ""
 
             logger.info(f"Entered TTS LLM Processing")
 
-            if response_type == "normal":
+            if response_type == "normal" and call_duration < 90:
                 llm_tts_system_context = (
-                    f"Your name is Bondi, and you are on a call with {self.firstname}, who is {self.user_age} years old. "
-                    f"Your job is to reply to {self.firstname} based on the last thing you said and what {self.firstname} just said. "
+                    f"Your name is Bondi, and you are on a brief call with {self.firstname}, who is {self.user_age} years old. "
+                    f"Your goal is to end the call as soon as possible but before you do so, you need to have a simple conversation with {self.firstname}."
+                    f"starting with phase 1. asking what {self.firstname} is up to right now, phase 2. asking {self.firstname} about how their day has been "
+                    f"and for any life updates, phase 3. transition to asking asking about their plans for the rest of the DAY. After going through all 3 phases, "
+                    f"it is VERY IMPORTANT that you start transitioning to the final phase 4: remarks that signal the end of the call and preparing to "
+                    f"say goodbye to {self.firstname} with the the goal of reaching your final response that you include an asterick at the end to signal the end "
+                    f"of the call. Also, note that the user might intentionally want to end the call early and if the user shows any sign of wanting to end "
+                    f"the call early, do not ask them any more questions and just immediately transition to ending call."
+                    f"IMPORTANT: Once you have finished your last remark to the user such as \"Goodbye\" or \"See you later\", "
+                    f"end your response with an asterick: * to signal that the call is over"
+                    f"Keep the conversation moving and don't get too deep into any specific topic. "
+                    f"Don't make any assumptions about {self.firstname}'s day unless you know with 100% certainty and only use information based on the conversation."
+                    f"You have limited time to get life updates from {self.firstname}, so be brief and to the point. "
+                    f"Be casual, drive the conversation with engaging questions, and speak very simply like a human would during a phone call. "
+                    f"If {self.firstname} has interesting information to share, ask them more about it but only at a surface level like a casual friend would. "
+                    f"Remember to not get too deep into any specific topic in the conversation and be brief, and fluid in switching topics. "
+                    f"Now, your job is to reply to {self.firstname} based on the last thing you (Bondi) said and what {self.firstname} just said. "
                     "Don't bring up details that you don't know for a hundred percent certainty."
-                    f"Talk very casually and be entertaining. "
-
-                    f"Respond in a way that shows you're *deeply listening*. "
-                    f"Focus on being engaging. Ask something that builds on what they just said. Bring up something specific, surprising, or thought-provoking. "
-                    f"Feel free to bring up the news or interesting facts relevant to the conversation. "
                     "- Always speak in 1 or 2 short, natural-sounding sentences.\n"
-                    "- Always end with a specific, open-ended follow-up question tied directly to what they just said.\n"
-                    "- Never talk about yourself, your abilities, or explain what you're doing.\n"
+                    "- Always end with a specific, open-ended follow-up question tied directly to what they just said unless the call is ending.\n"
+                    "- IMPORTANT:Never repeat the user's words or talk about yourself.\n"
                     "- Be witty and playful, but still be engaging and interesting."
                     "- Never say \"Haha\" in your answers"
 
@@ -321,12 +332,39 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 llm_tts_input = (
                     f"{self.firstname} just said: \"{self.current_user_input}\" " 
                     f"The last thing you (Bondi) said was: \"{self.agent_last_response}\" "
-                    "Reply warmly and casually with 1–2 sentences that reflect what they said and ask a thoughtful follow-up question. "
-                    "Make it feel like a real back-and-forth between friends and keep it casual, entertaining, and playful. "
-                    "Don't bring up details that you don't know for a hundred percent certainty."
-                    "Do not explain anything. If you respond, say only the reply. Nothing else."
+                    f"IMPORTANT:If user's response feels vague, respond briefly and then switch conversation topic."
+                    f"Say only the reply. Nothing else."
+                    f"Be extremely sensitive to any intention of {self.firstname} trying to end the call early or saying that they have to go or something similar, "
+                    f"and immediately transition to ending call phase."                    f"If the user shows any sign of wanting to end the call early, do not ask them any more questions and just immediately transition to ending call."
+                    "At your lasting remark such as \"Goodbye\" or \"See you later\", end your response with an asterick: * to signal that the call is over"
                 )
-            
+            else:
+                llm_tts_system_context = (
+                    f"Your name is Bondi, and you are on a brief call with {self.firstname}, who is {self.user_age} years old. "
+                    f"The call has been going on for {call_duration} seconds and it is now a good time to transition to ending call."
+                    f"Your goal is to end the call as soon as possible but in a natural human conversation manner."
+                    f"It is VERY IMPORTANT that you start transitioning to remarks that signal the end of the call "
+                    f"with the the goal of reaching your final response that you include an asterick at the end to signal the end of the call."
+                    f"IMPORTANT: Once you have finished your last remark to the user such as \"Goodbye\" or \"See you later\", "
+                    f"end your response with an asterick: * to signal that the call is over"
+
+                    f"Here's the full conversation so far:\n{self.conversation_history.strip()}"
+                    f"Here's contextual history about {self.firstname}: {self.conversation_context}"
+                )
+
+                llm_tts_input = (
+                    f"{self.firstname} just said: \"{self.current_user_input}\" " 
+                    f"The last thing you (Bondi) said was: \"{self.agent_last_response}\" "
+                    f"Say only the reply. Nothing else."
+                    f"Start naturally transitioning to ending call phase."
+                    f"Be extremely sensitive to any intention of {self.firstname} trying to end the call early or saying that they have to go or something similar, "
+                    f"and immediately transition to ending call phase."
+                    f"If the user shows any sign of wanting to end the call early, do not ask them any more questions and just immediately transition to ending call."
+                    f"If the user says something like \"I have to go\" or \"I have to go now\" or \"I have to get going\" or something similar, "
+                    f"immediately transition to ending call phase."
+                    "At your lasting remark such as \"Goodbye\" or \"See you later\", end your response with an asterick: * to signal that the call is over"
+                )
+
 
             # Get groq response
             groq_response = await groq_client.chat.completions.create(
@@ -345,6 +383,13 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             if self.transcribing_text:
                 self.bondi_llm_triggered = False
                 logger.info(f"Bondi Silence: LLM TTS Response Getting Rejected bc transcribing_text is True")
+                return
+            elif "*" in llm_response:
+                logger.info(f"LLM TTS Convo ending with following response: {llm_response}")
+                logger.info(f"Call Duration Time: {time.time() - self.start_call_time}")
+                self.call_is_ending = True
+                self.streaming_text = True
+                await self._stream_tts(llm_response)
                 return
             else:
                 logger.info(f"LLM TTS Response Getting Accepted with following response: {llm_response}")
