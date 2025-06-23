@@ -97,7 +97,6 @@ class SetGreetingView(APIView):
 
         bondi_contextual_history = [
             f"You are on a call with {user.firstname} on {weekday} in {time_of_day_context} at {hour:02d}:{minute:02d}",
-            f"{general_time_context} {meal_time_context}",
             f"It's {user.firstname}'s birthday today on {dob.month} {dob.day}." if birthday_today else None,
             "It's Christmas Day." if (now.month == 12 and now.day == 25) else None,
             "It's New Year's Day." if (now.month == 1 and now.day == 1) else None,
