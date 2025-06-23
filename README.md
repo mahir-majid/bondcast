@@ -15,9 +15,13 @@ Backend Setup
 
 6. In the backend folder, install all required Python packages by running: python -m pip install -r requirements.txt
    
-7. Download Docker Desktop and make sure you can run the following command in terminal without any issues: docker run -d --name redis-server -p 6379:6379 redis
+7. Download Docker Desktop and make sure it says 'Engine Running' at the bottom left of the application. If you're having issues, you might need to turn CPU Virtualization on.
+  
+8. Make sure you can run the following command in terminal without any issues and you see the container appear on Docker: docker run -d --name redis-server -p 6379:6379 redis
    
-8. Create a .env file in backend folder and ask a previous developer on the environment variables to set up.
+9. Create a .env file in backend folder and ask a previous developer on the environment variables to set up.
+
+10. From this link, https://alphacephei.com/vosk/models , download the vosk-model-small-en-us-0.15 file at the top, unzip folder, and add it to the convos folder in Django backend.
     
-9. Do "daphne backend.asgi:application" to run the backend.
+11. Do "daphne backend.asgi:application" to run the backend.
 
