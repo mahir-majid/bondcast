@@ -15,7 +15,7 @@ Backend Setup
 
 6. In the backend folder, install all required Python packages by running: python -m pip install -r requirements.txt
    
-7. Get Docker Desktop and install redis; Make sure you can run the following command in terminal without any issues: docker run -d --name redis-server -p 6379:6379 redis
+7. Download Docker Desktop and make sure you can run the following command in terminal without any issues: docker run -d --name redis-server -p 6379:6379 redis
    
 8. Create a .env file in backend folder and ask a previous developer on the environment variables to set up.
     
