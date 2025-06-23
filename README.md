@@ -22,6 +22,7 @@ Backend Setup
 9. Create a .env file in backend folder and ask a previous developer on the environment variables to set up.
 
 10. From this link, https://alphacephei.com/vosk/models , download the vosk-model-small-en-us-0.15 file at the top, unzip folder, and add it to the convos folder in Django backend.
+    The folder name is currently "vosk-model-small-en-us-0.15". Change it so the name is "vosk-model-en-us-0.15" (Basicially take out the word small)
     
-11. Do "daphne backend.asgi:application" to run the backend.
+12. Do "daphne backend.asgi:application" to run the backend.
 
