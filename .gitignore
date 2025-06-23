@@ -3,3 +3,4 @@ venv/
 kokoro_env/
 .vscode
 .vercel
+node_modules/
