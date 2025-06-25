@@ -140,57 +140,154 @@ export default function Join() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-300 via-blue-500 to-blue-700 text-white flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 text-white font-sans">
       <Navbar />
 
-      <main className="flex flex-col flex-1 items-center justify-center px-6 sm:px-12 text-center gap-8 max-w-3xl mx-auto">
-        <h1 className="text-5xl font-extrabold drop-shadow-lg">Sign Up</h1>
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
+      <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-[3vw] sm:px-[4vw]">
+        <div className="w-full max-w-[24rem]">
+          <div className="text-center mb-[1rem]">
+            <h1 className="text-[2.5rem] sm:text-[3rem] font-bold mb-[0.5rem] bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              Join Bondiver
+            </h1>
+            <p className="text-white/80 text-[1.125rem]">
+              Start your journey to effortless connections
+            </p>
+          </div>
 
         {step === "form" && (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full bg-purple-950/60 backdrop-blur-sm p-8 rounded-xl shadow-xl border border-white/20">
-            <div className="flex gap-4">
-              <input type="text" name="firstname" placeholder="First Name" value={form.firstname} onChange={handleChange} className="w-1/2 p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white" />
-              <input type="text" name="lastname" placeholder="Last Name" value={form.lastname} onChange={handleChange} className="w-1/2 p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white" />
+            <form onSubmit={handleSubmit} className="flex flex-col gap-[1rem] w-full bg-white/10 backdrop-blur-xl p-[1.5rem] rounded-[1rem] shadow-2xl border border-white/20">
+              <div className="grid grid-cols-2 gap-[0.75rem]">
+                <input 
+                  type="text" 
+                  name="firstname" 
+                  placeholder="First Name" 
+                  value={form.firstname} 
+                  onChange={handleChange} 
+                  required
+                  className="p-[0.75rem] rounded-[0.75rem] bg-white/10 border border-white/20 placeholder-white/60 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-[0.875rem]" 
+                />
+                <input 
+                  type="text" 
+                  name="lastname" 
+                  placeholder="Last Name" 
+                  value={form.lastname} 
+                  onChange={handleChange} 
+                  required
+                  className="p-[0.75rem] rounded-[0.75rem] bg-white/10 border border-white/20 placeholder-white/60 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-[0.875rem]" 
+                />
             </div>
 
-            <input type="date" name="dob" placeholder="Date of Birth" value={form.dob} onChange={handleChange} className="p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white" />
+              <input 
+                type="date" 
+                name="dob" 
+                placeholder="Date of Birth" 
+                value={form.dob} 
+                onChange={handleChange} 
+                required
+                className="p-[0.75rem] rounded-[0.75rem] bg-white/10 border border-white/20 placeholder-white/60 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-[0.875rem]" 
+              />
 
-            <input type="email" name="email" placeholder="Email" value={form.email} onChange={handleChange} required className={`p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white ${errors.email ? "ring-red-500 ring-2" : ""}`} />
-            {errors.email && <p className="text-red-300 text-sm text-left">{errors.email}</p>}
+              <input 
+                type="email" 
+                name="email" 
+                placeholder="Email" 
+                value={form.email} 
+                onChange={handleChange} 
+                required 
+                className={`p-[0.75rem] rounded-[0.75rem] bg-white/10 border placeholder-white/60 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-[0.875rem] ${errors.email ? "border-red-400" : "border-white/20"}`} 
+              />
+              {errors.email && <p className="text-red-300 text-[0.75rem] text-center">{errors.email}</p>}
 
-            <input type="text" name="username" placeholder="Username" value={form.username} onChange={handleChange} required minLength={3} className={`p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white ${errors.username ? "ring-red-500 ring-2" : ""}`} />
-            {errors.username && <p className="text-red-300 text-sm text-left">{errors.username}</p>}
+              <input 
+                type="text" 
+                name="username" 
+                placeholder="Username" 
+                value={form.username} 
+                onChange={handleChange} 
+                required 
+                minLength={3} 
+                className={`p-[0.75rem] rounded-[0.75rem] bg-white/10 border placeholder-white/60 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-[0.875rem] ${errors.username ? "border-red-400" : "border-white/20"}`} 
+              />
+              {errors.username && <p className="text-red-300 text-[0.75rem] text-center">{errors.username}</p>}
 
-            <input type="password" name="password" placeholder="Password" value={form.password} onChange={handleChange} required minLength={6} className={`p-3 rounded bg-white/20 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-white ${errors.password ? "ring-red-500 ring-2" : ""}`} />
-            {errors.password && <p className="text-red-300 text-sm text-left">{errors.password}</p>}
+              <input 
+                type="password" 
+                name="password" 
+                placeholder="Password" 
+                value={form.password} 
+                onChange={handleChange} 
+                required 
+                minLength={6} 
+                className={`p-[0.75rem] rounded-[0.75rem] bg-white/10 border placeholder-white/60 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-[0.875rem] ${errors.password ? "border-red-400" : "border-white/20"}`} 
+              />
+              {errors.password && <p className="text-red-300 text-[0.75rem] text-center">{errors.password}</p>}
 
-            <button type="submit" disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white cursor-pointer py-3 rounded font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-60">
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white cursor-pointer py-[0.75rem] rounded-[0.75rem] font-semibold text-[1rem] transition-all duration-300 disabled:opacity-60 shadow-lg hover:shadow-xl hover:shadow-cyan-500/25 transform hover:-translate-y-0.5"
+              >
               {isLoading ? "Checking..." : "Create Account"}
             </button>
           </form>
         )}
 
         {step === "verifyCode" && (
-          <form onSubmit={handleVerifyCode} className="flex flex-col gap-4 w-full bg-purple-950/60 backdrop-blur-sm p-6 rounded-xl shadow-xl border border-white/20">
-            <p className="text-white/80">A verification code was sent to your email. Please enter it below:</p>
-            <input type="text" name="verificationCode" placeholder="6-digit code" value={verificationCode} onChange={(e) => { setVerificationCode(e.target.value); setErrors({ ...errors, verificationCode: undefined }); }} required pattern="\d{6}" maxLength={6} className={`p-3 rounded bg-white/20 text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-white ${errors.verificationCode ? "ring-red-500 ring-2" : ""}`} />
-            {errors.verificationCode && <p className="text-red-300 text-sm text-left">{errors.verificationCode}</p>}
+            <form onSubmit={handleVerifyCode} className="flex flex-col gap-[1rem] w-full bg-white/10 backdrop-blur-xl p-[1.5rem] rounded-[1rem] shadow-2xl border border-white/20">
+              <div className="text-center">
+                <h2 className="text-[1.5rem] font-bold mb-[0.5rem] bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Verify Your Email</h2>
+                <p className="text-white/80 text-[0.875rem]">A verification code was sent to your email. Please enter it below:</p>
+              </div>
+              <input 
+                type="text" 
+                name="verificationCode" 
+                placeholder="6-digit code" 
+                value={verificationCode} 
+                onChange={(e) => { setVerificationCode(e.target.value); setErrors({ ...errors, verificationCode: undefined }); }} 
+                required 
+                pattern="\d{6}" 
+                maxLength={6} 
+                className={`p-[0.75rem] rounded-[0.75rem] bg-white/10 border placeholder-white/60 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-center text-[1.25rem] tracking-widest ${errors.verificationCode ? "border-red-400" : "border-white/20"}`} 
+              />
+              {errors.verificationCode && <p className="text-red-300 text-[0.75rem] text-center">{errors.verificationCode}</p>}
 
-            <button type="submit" disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-60 cursor-pointer">
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white py-[0.75rem] rounded-[0.75rem] font-semibold text-[1rem] transition-all duration-300 disabled:opacity-60 shadow-lg hover:shadow-xl hover:shadow-cyan-500/25 transform hover:-translate-y-0.5 cursor-pointer"
+              >
               {isLoading ? "Verifying..." : "Verify Code"}
             </button>
           </form>
         )}
 
         {step === "success" && (
-          <div className="text-green-200 font-semibold text-xl">
-            Registration successful! Redirecting to dashboard...
+            <div className="flex flex-col gap-[1rem] w-full bg-white/10 backdrop-blur-xl p-[1.5rem] rounded-[1rem] shadow-2xl border border-white/20 text-center">
+              <div className="w-[3rem] h-[3rem] bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-[0.5rem]">
+                <svg className="w-[1.5rem] h-[1.5rem] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-[1.5rem] font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">Welcome to Bondiver!</h2>
+              <p className="text-white/80 text-[0.875rem]">Registration successful! Redirecting to dashboard...</p>
           </div>
         )}
 
-        <p className="text-sm text-white/80 max-w-xs">
-          Already have an account? <a href="/signin" className="underline hover:text-white">Sign in here</a>.
-        </p>
+          <div className="text-center mt-[1.5rem]">
+            <p className="text-white/60 text-[0.875rem]">
+              Already have an account?{" "}
+              <a href="/signin" className="text-cyan-400 hover:text-cyan-300 transition-colors duration-300 font-semibold">
+                Sign in here
+              </a>
+            </p>
+          </div>
+        </div>
       </main>
     </div>
   );

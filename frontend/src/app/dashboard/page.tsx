@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../components/AuthContext";
-import AuthNavbar from "../components/AuthNavbar";
+import ProfileCard from "../components/ProfileCard";
 import LeftBar from "./components/leftbar";
 import FancyDashboardRecording from "./components/fancyDashboardRecording";
 import { HiTrash } from "react-icons/hi";
@@ -235,9 +235,6 @@ export default function Dashboard() {
   if (authLoading) {
     return (
       <div className="h-screen flex flex-col bg-gradient-to-br from-teal-200 via-blue-400 to-indigo-700">
-        <div className="z-1">
-          <AuthNavbar />
-        </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
         </div>
@@ -251,11 +248,9 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-teal-200 via-blue-400 to-indigo-700 text-white font-sans overflow-hidden">
-      <div className="z-1">
-        <AuthNavbar />
-      </div>
+      <ProfileCard />
 
-      <main className="flex flex-1 w-full h-[calc(100vh-64px)]">
+      <main className="flex flex-1 w-full h-full">
         <LeftBar 
           user={user} 
         />

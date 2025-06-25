@@ -5,6 +5,11 @@ import { AuthProvider } from "./components/AuthContext";
 export const metadata = {
   title: "Bondiver",
   description: "Where friendships buzz and bloom",
+  icons: {
+    icon: '/bondiverLogo.svg',
+    shortcut: '/bondiverLogo.svg',
+    apple: '/bondiverLogo.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
