@@ -421,6 +421,8 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     model_id="eleven_flash_v2",
                     output_format="pcm_16000"
                 ))
+            
+            # zGjIP4SZlMnY9m93k97r (Another Voice Id to try out)
 
             audio_chunks = await asyncio.get_event_loop().run_in_executor(executor, stream_chunks_sync)
 

@@ -23,7 +23,7 @@ export default function Home() {
           </div>
           
           <p className="text-[1.25rem] sm:text-[1.5rem] font-medium max-w-[80vw] mx-auto text-white/90 mb-[3rem] leading-relaxed">
-             Powered by Conversational Voice AI
+             Powered by Conversational AI
           </p>
 
           <div className="flex justify-center">
