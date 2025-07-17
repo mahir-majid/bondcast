@@ -1,9 +1,9 @@
-from channels.generic.websocket import AsyncJsonWebsocketConsumer
-from channels.db import database_sync_to_async
-from django.contrib.auth import get_user_model
+from channels.generic.websocket import AsyncJsonWebsocketConsumer  # type: ignore
+from channels.db import database_sync_to_async  # type: ignore
+from django.contrib.auth import get_user_model  # type: ignore
 from .models import FriendRequest, Friendship
 import logging
-from django.db import models
+from django.db import models  # type: ignore
 from urllib.parse import parse_qs
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class FriendRequestConsumer(AsyncJsonWebsocketConsumer):
             return
 
         # Get user from username
-        user = await self.get_user_by_username(username)
+        user = await self.get_user_by_username(username)  # type: ignore
         if not user:
             await self.close()
             return
@@ -88,8 +88,8 @@ class FriendRequestConsumer(AsyncJsonWebsocketConsumer):
             # logger.info(f"Friend request WS connected for user {username}")
             
             # Get both friends and pending requests
-            friends = await self.get_user_friends(user.id)
-            pending_requests = await self.get_pending_requests(user.id)
+            friends = await self.get_user_friends(user.id)  # type: ignore
+            pending_requests = await self.get_pending_requests(user.id)  # type: ignore
             
             # Log what we're sending
             # logger.info(f"Sending data for user {username}:")
@@ -127,8 +127,21 @@ class FriendRequestConsumer(AsyncJsonWebsocketConsumer):
     async def friend_request_notification(self, event):
         # Add first and last name to the notification data
         if 'from_user' in event['data']:
-            from_user = await self.get_user_by_username(event['data']['from_user']['username'])
+            from_user = await self.get_user_by_username(event['data']['from_user']['username'])  # type: ignore
             if from_user:
                 event['data']['from_user']['firstname'] = from_user.firstname
                 event['data']['from_user']['lastname'] = from_user.lastname
+        await self.send_json(event["data"]) 
+
+    async def friend_removed_notification(self, event):
+        # Add first and last name to the notification data
+        if 'friend_user' in event['data']:
+            friend_user = await self.get_user_by_username(event['data']['friend_user']['username'])  # type: ignore
+            if friend_user:
+                event['data']['friend_user']['firstname'] = friend_user.firstname
+                event['data']['friend_user']['lastname'] = friend_user.lastname
+        await self.send_json(event["data"])
+
+    async def message_notification(self, event):
+        # Handle new message notifications
         await self.send_json(event["data"]) 

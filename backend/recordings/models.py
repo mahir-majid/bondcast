@@ -1,6 +1,6 @@
 # audio/models.py
-from django.db import models
-from django.contrib.auth import get_user_model
+from django.db import models  # type: ignore
+from django.contrib.auth import get_user_model  # type: ignore
 
 User = get_user_model()
 

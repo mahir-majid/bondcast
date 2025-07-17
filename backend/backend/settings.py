@@ -13,8 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 import os
-from dotenv import load_dotenv
-import dj_database_url
+from dotenv import load_dotenv  # type: ignore
+import dj_database_url  # type: ignore
 
 # Load environment variables from .env file
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -55,9 +55,11 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "users",
     "channels",
-    "convos",
+    "bondcastConvos",
     "friends",
     "recordings",
+    "aiMessages",
+    "bondcastRequests",
 ]
 
 MIDDLEWARE = [

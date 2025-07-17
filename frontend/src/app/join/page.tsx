@@ -129,6 +129,7 @@ export default function Join() {
       }
 
       await login(form.username, form.password);
+      sessionStorage.setItem('cameFromJoin', 'true');
       setStep("success");
       setTimeout(() => router.push("/dashboard"), 2000);
     } catch (error: unknown) {

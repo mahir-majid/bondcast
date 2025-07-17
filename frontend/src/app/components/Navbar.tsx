@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 
 export default function Navbar() {
@@ -28,7 +29,13 @@ export default function Navbar() {
             className="group"
           >
             <span className="flex items-center gap-[0.75rem] text-[1.5rem] sm:text-[1.875rem] font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent group-hover:from-purple-200 group-hover:to-white transition-all duration-300 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)] group-hover:drop-shadow-[0_0_25px_rgba(168,85,247,0.7)]">
-              <img src="/bondiverLogoImg.png" alt="Bondiver Logo" className="h-[1.5rem] w-auto sm:h-[1.875rem]" />
+              <Image 
+                src="/bondiverLogoImg.png" 
+                alt="Bondiver Logo" 
+                width={30}
+                height={30}
+                className="h-[1.5rem] w-auto sm:h-[1.875rem]" 
+              />
               Bondiver
             </span>
           </Link>

@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { HiMail, HiArrowLeft } from "react-icons/hi";
-import Chat from "../../components/Chat";
-import FancySendRecording from "./fancySendRecording";
+import { useEffect, useState, useCallback } from "react";
+import { HiUsers, HiMicrophone, HiPaperAirplane } from "react-icons/hi";
+import ListFriendRequests from "./listFriendRequests";
+import BondcastStudio from "./bondcastStudio";
+import BondcastRecording from "./bondcastRecording";
+import MessageBondi from "./messageBondi";
+import MessageFriend from "./messageFriend";
+import ListFriends from "./listFriends";
+import SendBondcastRequest from "./sendBondcastRequest";
+import GeneralBondcastRequest from "./generalBondcastRequest";
 
 interface Friend {
   id: number;
@@ -24,13 +30,22 @@ interface FriendRequest {
   created_at: string;
 }
 
-type LeftDashBarState = "listFriends" | "listFriendRequests" | "recording";
+interface Topic {
+  id: number;
+  title: string;
+  description: string;
+}
+
+type LeftDashBarState = "listFriends" | "listFriendRequests" | "recording" | "messageBondi" | "messageFriend" | "bondCastStudio" | "bondcastRecording" | "sendBondcastRequest" | "generalBondcastRequest";
 
 interface LeftBarProps {
   user: {
     username: string;
     firstname: string;
   };
+  onNavigateToTopics: () => void;
+  onHideBrowseTopics: () => void;
+  selectedTopic: Topic | null;
 }
 
 const scrollbarStyles = `
@@ -55,24 +70,19 @@ const scrollbarStyles = `
   }
 `;
 
-export default function LeftBar({ user }: LeftBarProps) {
+export default function LeftBar({ user, onNavigateToTopics, onHideBrowseTopics, selectedTopic }: LeftBarProps) {
   const baseURL = process.env.NEXT_PUBLIC_URL;
   const websocketURL = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
-  const [newFriend, setNewFriend] = useState("");
-  const [newFriendMessage, setNewFriendMessage] = useState("");
-  const [newFriendSuccess, setNewFriendSuccess] = useState<boolean | null>(null);
-  const [isMessageVisible, setIsMessageVisible] = useState(false);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [leftDashBarState, setLeftDashBarState] = useState<LeftDashBarState>("listFriends");
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
-  const [selectedFriendIds, setSelectedFriendIds] = useState<number[]>([]);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [buttonText, setButtonText] = useState<string>("");
-  const wsRef = useRef<WebSocket | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [recordingTitle, setRecordingTitle] = useState("");
+  const [unreadAiMessages, setUnreadAiMessages] = useState(0);
+  const [pendingBondcastRequests, setPendingBondcastRequests] = useState(0);
+  const [isFriendsLoaded, setIsFriendsLoaded] = useState(false);
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [selectedFriendForBondcast, setSelectedFriendForBondcast] = useState<Friend | null>(null);
+  const [unreadFriendMessages, setUnreadFriendMessages] = useState<{[key: string]: number}>({});
+  const [bondcastData, setBondcastData] = useState<{ title: string; description: string; requestId: number } | undefined>(undefined);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -83,27 +93,93 @@ export default function LeftBar({ user }: LeftBarProps) {
     };
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+  // Fetch initial unread AI messages count
+  const fetchUnreadAiMessages = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${baseURL}/api/ai-messages/conversation/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadAiMessages(data.unread_count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread AI messages:', error);
+      console.log(unreadAiMessages);
+    }
+  }, [baseURL, unreadAiMessages]);
+
+  // Fetch initial unread friend message counts
+  const fetchUnreadFriendMessages = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${baseURL}/api/friends/unread-counts/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Add +1 to compensate for timing issues with backend fetch
+        const adjustedCounts: {[key: string]: number} = {};
+        for (const [username, count] of Object.entries(data.unread_counts || {})) {
+          adjustedCounts[username] = (count as number) + 1;
+        }
+        setUnreadFriendMessages(adjustedCounts);
+      }
+    } catch (error) {
+      console.error('Error fetching unread friend messages:', error);
+    }
+  }, [baseURL]);
+
+  // Fetch initial pending bondcast requests count
+  const fetchPendingBondcastRequests = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${baseURL}/api/bondcast-requests/pending/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Add +1 to compensate for timing issues with backend fetch (same as friends)
+        setPendingBondcastRequests((data.pending_count || 0) + 1);
+      }
+    } catch (error) {
+      console.error('Error fetching pending bondcast requests:', error);
+    }
+  }, [baseURL]);
+
+  // WebSocket connection for friends and friend requests
   useEffect(() => {
     if (!user) return;
 
-    console.log('[LeftBar] User detected, setting loading to true...');
-    setIsLoading(true);
-
     const token = localStorage.getItem("accessToken");
-    if (!token) {
-      console.log('[LeftBar] No access token found');
-      setIsLoading(false);
-      return;
-    }
+    if (!token) return;
+
+    // Fetch initial unread counts
+    fetchUnreadAiMessages();
+    fetchUnreadFriendMessages();
+    fetchPendingBondcastRequests();
 
     const socket = new WebSocket(`${websocketURL}/ws/friend-requests/?username=${user.username}&token=${token}`);
-    wsRef.current = socket;
-
-    console.log('[LeftBar] Connecting WebSocket...');
 
     socket.onopen = () => {
-      console.log('[LeftBar] WebSocket open, sending ping...');
+      console.log('[LeftBar] WebSocket connected for friends and friend requests');
       socket.send(JSON.stringify({ type: 'ping' }));
     };
 
@@ -113,19 +189,26 @@ export default function LeftBar({ user }: LeftBarProps) {
         console.log('[LeftBar] Received WebSocket message:', data);
         
         if (data && data.friend_requests && data.user_friends) {
-          console.log('[LeftBar] Setting friends and friend requests, updating loading state...');
+          console.log('[LeftBar] Setting friends and friend requests');
           setFriends(data.user_friends);
           setFriendRequests(data.friend_requests);
-          setIsLoading(false);
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-          console.log('[LeftBar] Loading state updated to false');
+          setIsFriendsLoaded(true);
+        } else if (data && data.type === 'new_message') {
+          // Handle new message notification
+          console.log('[LeftBar] New message received:', data);
+          const message = data.message;
+          const senderUsername = message.sender_username;
+          
+          // Simple increment (duplicates will be handled by dividing by 2 in display)
+          setUnreadFriendMessages(prevCounts => ({
+            ...prevCounts,
+            [senderUsername]: (prevCounts[senderUsername] || 0) + 1
+          }));
         }
       } catch (error) {
         console.log('[LeftBar] Error parsing message:', error);
         setFriends([]);
         setFriendRequests([]);
-        setIsLoading(false);
-        console.log('[LeftBar] Loading state updated to false after error');
       }
     };
 
@@ -133,125 +216,152 @@ export default function LeftBar({ user }: LeftBarProps) {
       console.log('[LeftBar] WebSocket error:', error);
       setFriends([]);
       setFriendRequests([]);
-      setIsLoading(false);
-      console.log('[LeftBar] Loading state updated to false after WebSocket error');
     };
 
     socket.onclose = (event) => {
       console.log('[LeftBar] WebSocket closed with code:', event.code, 'reason:', event.reason);
       setFriends([]);
       setFriendRequests([]);
-      setIsLoading(false);
-      console.log('[LeftBar] Loading state updated to false after WebSocket close');
     };
 
-    timeoutRef.current = setTimeout(() => {
-      console.log('[LeftBar] Safety timeout triggered, forcing loading to false');
-      setIsLoading(false);
-    }, 3000);
+    // Bondcast requests WebSocket connection
+    const bondcastSocket = new WebSocket(`${websocketURL}/ws/bondcast-requests/${user.username}/${token}/`);
+
+    bondcastSocket.onopen = () => {
+      console.log('[LeftBar] WebSocket connected for bondcast requests');
+    };
+
+    bondcastSocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('[LeftBar] Received bondcast WebSocket message:', data);
+        
+        if (data && data.type === 'new_bondcast_request') {
+          // Simple increment (duplicates will be handled by dividing by 2 in display, same as friends)
+          setPendingBondcastRequests(prev => prev + 1);
+        } else if (data && data.type === 'connection_established') {
+          // Add +1 to compensate for timing issues (same as friends)
+          setPendingBondcastRequests((data.pending_count || 0) + 1);
+        } else if (data && data.type === 'requests_marked_seen') {
+          // Clear the count when requests are marked as seen
+          setPendingBondcastRequests(0);
+        }
+      } catch (error) {
+        console.log('[LeftBar] Error parsing bondcast message:', error);
+      }
+    };
+
+    bondcastSocket.onerror = (error) => {
+      console.log('[LeftBar] Bondcast WebSocket error:', error);
+    };
+
+    bondcastSocket.onclose = (event) => {
+      console.log('[LeftBar] Bondcast WebSocket closed with code:', event.code, 'reason:', event.reason);
+    };
 
     return () => {
-      console.log('[LeftBar] Cleanup: clearing timeout and closing WebSocket');
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.close();
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
+      if (bondcastSocket.readyState === WebSocket.OPEN) {
+        bondcastSocket.close();
       }
     };
-  }, [user]);
+  }, [user, websocketURL, fetchUnreadAiMessages, fetchUnreadFriendMessages, fetchPendingBondcastRequests]);
 
-  const addFriend = async () => {
-    if (!newFriend.trim()) {
-      setNewFriendMessage("Can't leave field Empty");
-      setNewFriendSuccess(false);
-      setIsMessageVisible(true);
-      setTimeout(() => {
-        setIsMessageVisible(false);
-        setTimeout(() => {
-          setNewFriendMessage("");
-        }, 300);
-      }, 1800);
-      return;
-    }
+  
+  return (
+    <aside className="relative w-96 bg-gradient-to-b from-blue-400 via-blue-500 to-blue-600 bg-opacity-90 rounded-xl p-6 flex flex-col gap-6 text-blue-900 shadow-lg">
+      {leftDashBarState === "listFriends" && (
+        <div className="flex items-center justify-between">
+          <h2 className="text-3xl font-extrabold drop-shadow-2xl text-black">
+            Friends
+          </h2>
+          <div className="relative flex items-center gap-4">
+            <button
+              aria-label="Record a BondCast"
+              className="text-indigo-300 hover:text-white transition relative"
+              onClick={() => setLeftDashBarState("bondCastStudio")}
+            >
+              <HiMicrophone
+                size={22}
+                className="mt-[6px] cursor-pointer text-indigo-200 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200"
+              />
+              {Math.floor(pendingBondcastRequests / 2) > 0 && (
+                <div className="absolute -top-2.5 -right-3 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                  {Math.floor(pendingBondcastRequests / 2)}
+                </div>
+              )}
+            </button>
+            {/* General Bondcast Request (Airplane Icon) */}
+            <button
+              aria-label="Send General Bondcast Request"
+              className="text-indigo-300 hover:text-white transition relative"
+              onClick={() => {
+                setLeftDashBarState("generalBondcastRequest");
+              }}
+            >
+              <HiPaperAirplane
+                size={22}
+                className="mt-[6px] cursor-pointer text-indigo-200 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200"
+              />
+            </button>
+            <button
+              aria-label="View friend requests"
+              className="text-indigo-300 hover:text-white transition relative"
+              onClick={() => {
+                setLeftDashBarState("listFriendRequests");
+              }}
+            >
+              <HiUsers
+                size={26}
+                className="mt-[6px] cursor-pointer text-indigo-200 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200"
+              />
+              {friendRequests.length > 0 && (
+                <div className="absolute -top-2.5 -right-3 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                  {friendRequests.length}
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      setNewFriendMessage("You must be logged in to send a friend request.");
-      setNewFriendSuccess(false);
-      setIsMessageVisible(true);
-      setTimeout(() => {
-        setIsMessageVisible(false);
-        setTimeout(() => {
-          setNewFriendMessage("");
-        }, 300);
-      }, 1800);
-      return;
-    }
+      {leftDashBarState === "listFriends" && (
+        <ListFriends
+          friends={friends}
+          isFriendsLoaded={isFriendsLoaded}
+          unreadCounts={unreadFriendMessages}
+          onAddFriend={async () => {
+            // This will be handled by ListFriends component internally
+          }}
+          onRemoveFriend={async (friendUsername: string) => {
+            // Remove friend from local state
+            setFriends(prev => prev.filter(friend => friend.username !== friendUsername));
+          }}
+          onMessageFriend={(friend: Friend) => {
+            setSelectedFriend(friend);
+            setLeftDashBarState("messageFriend");
+            // Clear unread count when opening chat
+            setUnreadFriendMessages(prev => ({
+              ...prev,
+              [friend.username]: 0
+            }));
+          }}
+          onSendBondcastRequest={(friend: Friend) => {
+            setSelectedFriendForBondcast(friend);
+            setLeftDashBarState("sendBondcastRequest");
+          }}
+        />
+      )}
 
-    try {
-      const response = await fetch(`${baseURL}/api/friends/add/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ to_username: newFriend.trim() }),
-      });
-
-      const data = await response.json();
-
-      if (!data.error) {
-        setNewFriendMessage("Friend request sent successfully!");
-        setNewFriendSuccess(true);
-        setNewFriend(""); // Clear the input field
-        setIsMessageVisible(true);
-        setTimeout(() => {
-          setIsMessageVisible(false);
-          setTimeout(() => {
-            setNewFriendMessage("");
-          }, 300);
-        }, 1800);
-      } else {
-        setNewFriendSuccess(false);
-        console.log(data.error);
-        const errorMessage = data.error || "Failed to send friend request.";
-        setNewFriendMessage(errorMessage);
-        setIsMessageVisible(true);
-        setTimeout(() => {
-          setIsMessageVisible(false);
-          setTimeout(() => {
-            setNewFriendMessage("");
-          }, 300);
-        }, 1800);
-      }
-    } catch {
-      setNewFriendMessage("An error occurred while sending the friend request.");
-      setNewFriendSuccess(false);
-      setIsMessageVisible(true);
-      setTimeout(() => {
-        setIsMessageVisible(false);
-        setTimeout(() => {
-          setNewFriendMessage("");
-        }, 300);
-      }, 1800);
-    }
-  };
-
-  const acceptFriendRequest = async (fromUsername: string) => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${baseURL}/api/friends/accept/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ from_username: fromUsername }),
-      });
-
-      const data = await response.json();
-      if (!data.error) {
+      {leftDashBarState === "listFriendRequests" && (
+        <ListFriendRequests
+          friendRequests={friendRequests}
+          onBack={() => {
+            setLeftDashBarState("listFriends");
+          }}
+          onAcceptRequest={(fromUsername: string) => {
         // Find the request before removing it
         const acceptedRequest = friendRequests.find(req => req.from_user.username === fromUsername);
         
@@ -267,411 +377,93 @@ export default function LeftBar({ user }: LeftBarProps) {
             lastname: acceptedRequest.from_user.lastname
           }]);
         }
-      }
-    } catch (error) {
-      console.log('Error accepting friend request:', error);
-    }
-  };
-
-  const declineFriendRequest = async (fromUsername: string) => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${baseURL}/api/friends/decline/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ from_username: fromUsername }),
-      });
-
-      const data = await response.json();
-      if (!data.error) {
+          }}
+          onDeclineRequest={(fromUsername: string) => {
         // Remove the declined request from the list
         setFriendRequests(prev => prev.filter(req => req.from_user.username !== fromUsername));
-      }
-    } catch (error) {
-      console.log('Error declining friend request:', error);
-    }
-  };
-
-  const handleRecordingComplete = (url: string) => {
-    setRecordingUrl(url);
-    setLeftDashBarState("recording");
-        
-    // Play beep sound for 0.75 seconds
-    const beep = new Audio('/beep.mp3');
-    beep.play();
-    setTimeout(() => {
-      beep.pause();
-      beep.currentTime = 0;
-    }, 750);
-  };
-
-  const handleSendRecording = async () => {
-    if (!recordingUrl) return;
-    if (!recordingTitle.trim()) {
-      setButtonText("Please include a title");
-      setTimeout(() => {
-        setButtonText("");
-      }, 1300);
-      return;
-    }
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      console.error("No access token found");
-      return;
-    }
-    try {
-      setShowSuccess(true);
-      
-      // Create a FormData object to send the audio file
-      const formData = new FormData();
-      
-      // Convert Blob URL to actual Blob
-      const response = await fetch(recordingUrl);
-      const audioBlob = await response.blob();
-      
-      // Create a proper File object with the correct MIME type
-      const audioFile = new File([audioBlob], 'recording.wav', { 
-        type: 'audio/webm' // Change to webm since that's what the browser records in
-      });
-      formData.append('audio', audioFile);
-      formData.append('title', recordingTitle.trim());
-      console.log('Recording title being sent:', recordingTitle.trim());
-      const recipientsToSend = selectedFriendIds.length === 0 
-        ? friends.map(friend => friend.id)
-        : selectedFriendIds;
-      recipientsToSend.forEach(id => {
-        formData.append('to_users[]', id.toString());
-      });
-
-      // Upload the recording
-      const uploadResponse = await fetch(`${baseURL}/api/recordings/upload/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Failed to upload recording');
-      }
-
-      // Show success message immediately
-      // Fetch updated recordings in the background
-      fetch(`${baseURL}/api/recordings/get/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      .then(recordingsResponse => recordingsResponse.json())
-      .then(data => {
-        // Sort recordings by created_at in descending order (newest first)
-        const sortedRecordings = [...data].sort((a, b) => {
-          const dateA = new Date(a.created_at);
-          const dateB = new Date(b.created_at);
-          return dateB.getTime() - dateA.getTime();
-        });
-        // Update the recordings state in the parent component
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('recordingsUpdated', { 
-            detail: { recordings: sortedRecordings }
-          }));
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching updated recordings:', error);
-      });
-      
-      // Clear the recording and reset state after a delay
-      setTimeout(() => {
-        setRecordingUrl(null);
-        setSelectedFriendIds([]);
-        setRecordingTitle("");
-        setLeftDashBarState("listFriends");
-        setShowSuccess(false);
-      }, 1200);
-    } catch (error) {
-      console.error('Error sending recording:', error);
-      alert('Error sending recording. Please try again.');
-    }
-  };
-
-  const handleCancelRecording = () => {
-    setRecordingUrl(null);
-    setLeftDashBarState("listFriends");
-  };
-
-  return (
-    <aside className="relative w-96 bg-gradient-to-b from-blue-400 via-blue-500 to-blue-600 bg-opacity-90 rounded-xl p-6 flex flex-col gap-6 text-blue-900 shadow-lg">
-      {isLoading ? (
-        <div className="flex items-center justify-center h-full">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-        </div>
-      ) : (
-        <>
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-extrabold drop-shadow-2xl text-black">
-          {leftDashBarState === "listFriends" ? "Friends" : 
-           leftDashBarState === "listFriendRequests" ? "Friend Requests" : 
-           "Recording Studio"}
-        </h2>
-        {leftDashBarState !== "recording" ? (
-          <div className="relative flex items-center">
-            <button
-              aria-label={leftDashBarState === "listFriends" ? "View friend requests" : "Back to friends"}
-              className="text-indigo-300 hover:text-white transition"
-              onClick={() => {
-                setLeftDashBarState(prev => prev === "listFriends" ? "listFriendRequests" : "listFriends");
-                setNewFriendMessage("");
-              }}
-            >
-              {leftDashBarState === "listFriends" ? (
-                <>
-                  <HiMail
-                    size={26}
-                    className="mt-[6px] cursor-pointer text-indigo-200 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200"
-                  />
-                  {friendRequests.length > 0 && (
-                    <div className="absolute -top-1.5 -right-3 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                      {friendRequests.length}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <HiArrowLeft
-                  size={26}
-                  className="mt-[6px] cursor-pointer text-indigo-200 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200"
-                />
-              )}
-            </button>
-          </div>
-        ) : (
-          <div className="relative flex items-center">
-            <button
-              onClick={handleCancelRecording}
-              className="text-indigo-300 hover:text-white transition"
-            >
-              <HiArrowLeft
-                size={26}
-                className="mt-[6px] cursor-pointer text-indigo-200 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200"
-              />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {leftDashBarState === "listFriends" && (
-        <>
-          <div className="flex gap-3 items-center mt-[-10px]">
-            <input
-              type="text"
-              placeholder="Add New Friend By Username"
-              value={newFriend}
-              onChange={(e) => setNewFriend(e.target.value)}
-              className="flex-1 rounded-full px-4 py-2 text-black border-2 border-blue-500/30 bg-blue-200/50 placeholder-black focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:bg-blue-200 transition-all duration-200"
-            />
-            <button
-              onClick={addFriend}
-              className="bg-blue-900 hover:bg-blue-800 cursor-pointer text-white px-4 py-2 rounded-full font-semibold whitespace-nowrap transition"
-            >
-              Send
-            </button>
-          </div>
-
-          {newFriendMessage && (
-            <div className="absolute right-30 top-19 z-50 transform -translate-y-full">
-              <div
-                className={`w-32 rounded-lg px-4 py-2 text-sm shadow-lg text-white whitespace-normal break-words transition-opacity duration-300 ${
-                  newFriendSuccess ? "bg-green-600" : "bg-red-600"
-                } ${isMessageVisible ? 'opacity-100' : 'opacity-0'}`}
-              >
-                {newFriendMessage}
-                <div
-                  className={`absolute right-3 top-full w-0 h-0 border-l-8 border-r-8 border-t-8 ${
-                    newFriendSuccess ? "border-t-green-600" : "border-t-red-600"
-                  } border-l-transparent border-r-transparent`}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="mt-[0]">
-            <Chat 
-              llmMode="user_called" 
-              onRecordingComplete={handleRecordingComplete}
-            />
-                {isLoading && (
-                  <div className="mt-4 flex items-center justify-center">
-                    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-                  </div>
-                )}
-          </div>
-
-          <div className="flex flex-col gap-3 mt-[0] max-h-[calc(100vh-325px)] overflow-y-auto custom-scrollbar pr-4">
-            {friends.map((friend) => (
-              <div
-                key={friend.id}
-                className="bg-blue-200/90 rounded-lg p-4 border-2 border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-200 group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-lg font-bold text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]">
-                    {friend.firstname[0]}{friend.lastname[0]}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-blue-700">{friend.firstname} {friend.lastname}</h3>
-                    <p className="text-sm text-black">@{friend.username}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+          }}
+        />
       )}
 
-      {leftDashBarState === "recording" && recordingUrl && (
-        <div className="mt-[-7px] flex flex-col gap-4">
-          <div className="p-4 bg-pink-200/90 rounded-lg backdrop-blur-sm border-2 border-transparent hover:border-pink-300/50 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] transition-all duration-200">
-            <div className="relative">
-              <input
-                type="text"
-                value={recordingTitle}
-                onChange={e => setRecordingTitle(e.target.value)}
-                placeholder="Enter a title for your recording"
-                className="w-full mb-1 px-3 py-2 border-2 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-black"
-                disabled={showSuccess}
-                maxLength={150}
-              />
-              <div className="text-right text-sm text-gray-600 mb-4">
-                {recordingTitle.length}/150 characters
-              </div>
-            </div>
-            <div className="mt-[-10px]">
-              <FancySendRecording 
-                audioSrc={recordingUrl}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <button
-              onClick={friends.length === 0 ? () => setLeftDashBarState("listFriends") : handleSendRecording}
-              className={`w-full bg-blue-900 hover:bg-blue-800 cursor-pointer text-white px-4 py-2 rounded-full font-semibold transition relative ${
-                showSuccess ? 'bg-green-500 hover:bg-green-600' : ''
-              }`}
-              disabled={showSuccess}
-            >
-              {showSuccess ? (
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Sent Successfully!
-                </div>
-              ) : buttonText ? (
-                buttonText
-              ) : friends.length === 0 ? (
-                "Add a Friend to Send Recordings"
-              ) : (
-                selectedFriendIds.length === 0 
-                  ? `Send to All Friends` 
-                  : `Send to ${selectedFriendIds.length} Selected Friend${selectedFriendIds.length === 1 ? '' : 's'}`
-              )}
-            </button>
-
-            {friends.length > 0 && (
-              <div className="max-h-[calc(100vh-400px)] overflow-y-auto custom-scrollbar pr-4">
-                <div className="flex flex-col gap-3">
-                  {friends.map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="bg-blue-100/80 rounded-lg p-4 border-2 border-transparent hover:border-blue-400/50 hover:bg-blue-200/90 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-200 cursor-pointer group flex items-center justify-between"
-                      onClick={() => {
-                        const selectedFriends = new Set(selectedFriendIds);
-                        if (selectedFriends.has(friend.id)) {
-                          selectedFriends.delete(friend.id);
-                        } else {
-                          selectedFriends.add(friend.id);
-                        }
-                        setSelectedFriendIds(Array.from(selectedFriends));
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-400 flex items-center justify-center text-lg font-bold text-white group-hover:bg-blue-500 group-hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all duration-200">
-                          {friend.firstname[0]}{friend.lastname[0]}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-blue-800 group-hover:text-blue-700 transition-colors duration-200">{friend.firstname} {friend.lastname}</h3>
-                          <p className="text-sm text-black group-hover:text-black transition-colors duration-200">@{friend.username}</p>
-                        </div>
-                      </div>
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200
-                        ${selectedFriendIds.includes(friend.id) 
-                          ? 'bg-blue-500 border-blue-500 group-hover:shadow-[0_0_10px_rgba(59,130,246,0.3)]' 
-                          : 'border-blue-400 group-hover:border-blue-500'}`}
-                      >
-                        {selectedFriendIds.includes(friend.id) && (
-                          <div className="w-2 h-2 bg-white rounded-full" />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {leftDashBarState === "bondCastStudio" && (
+        <BondcastStudio
+          friends={friends}
+          onRecordingComplete={() => setLeftDashBarState("bondCastStudio")}
+          onBack={() => {
+            // Refresh bondcast request count when going back to ensure up-to-date data
+            fetchPendingBondcastRequests();
+            setLeftDashBarState("listFriends");
+          }}
+          onRecordingCancel={() => setLeftDashBarState("listFriends")}
+          onStartRecording={(bondcastData) => {
+            // Store the bondcast data and switch to recording
+            if (bondcastData) {
+              setBondcastData(bondcastData);
+            }
+            setLeftDashBarState("bondcastRecording");
+          }}
+          onClearBondcastCount={() => {
+            // Clear the count when entering studio (will be refreshed when going back)
+            setPendingBondcastRequests(0);
+          }}
+        />
       )}
 
-      {leftDashBarState === "listFriendRequests" && (
-        <div className="flex flex-col gap-3 mt-[-7px] max-h-[calc(100vh-200px)] overflow-y-auto custom-scrollbar pr-4">
-          {friendRequests.length > 0 ? (
-            friendRequests.map((request) => (
-              <div
-                key={request.from_user.id}
-                className="bg-blue-200/50 rounded-lg p-4 border-2 border-blue-500/30 hover:border-blue-500 hover:bg-blue-300/70 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-200"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-m font-bold text-white">
-                    {request.from_user.firstname?.[0]}{request.from_user.lastname?.[0]}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-blue-900">
-                      {request.from_user.firstname} {request.from_user.lastname}
-                    </h3>
-                    <p className="text-sm text-black">@{request.from_user.username}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => acceptFriendRequest(request.from_user.username)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition cursor-pointer"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => declineFriendRequest(request.from_user.username)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition cursor-pointer"
-                  >
-                    Decline
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="mt-[5px] text-center text-black text-lg">
-              No friend requests to display
-            </div>
-          )}
-        </div>
-          )}
-        </>
+      {leftDashBarState === "bondcastRecording" && (
+        <BondcastRecording
+          friends={friends}
+          onRecordingComplete={() => setLeftDashBarState("bondcastRecording")}
+          onBack={() => setLeftDashBarState("bondCastStudio")}
+          onRecordingCancel={() => setLeftDashBarState("bondCastStudio")}
+          bondcastData={bondcastData}
+        />
+      )}
+
+      {leftDashBarState === "messageBondi" && (
+        <MessageBondi
+          user={user}
+          onBack={() => setLeftDashBarState("listFriends")}
+          onUnreadCountUpdate={setUnreadAiMessages}
+        />
+      )}
+
+      {leftDashBarState === "messageFriend" && selectedFriend && (
+        <MessageFriend
+          user={user}
+          friend={selectedFriend}
+          setUnreadFriendMessages={setUnreadFriendMessages}
+          onBack={() => {
+            setSelectedFriend(null);
+            // Refresh unread counts when going back to ensure up-to-date data
+            fetchUnreadFriendMessages();
+            setLeftDashBarState("listFriends");
+          }}
+        />
+      )}
+
+      {leftDashBarState === "sendBondcastRequest" && selectedFriendForBondcast && (
+        <SendBondcastRequest
+          friend={selectedFriendForBondcast}
+          onBack={() => {
+            setSelectedFriendForBondcast(null);
+            setLeftDashBarState("listFriends");
+            onHideBrowseTopics();
+          }}
+          onNavigateToTopics={onNavigateToTopics}
+          selectedTopic={selectedTopic}
+          allFriends={friends}
+        />
+      )}
+
+      {leftDashBarState === "generalBondcastRequest" && (
+        <GeneralBondcastRequest
+          allFriends={friends}
+          currentUser={user}
+          onBack={() => setLeftDashBarState("listFriends")}
+          onNavigateToTopics={onNavigateToTopics}
+          selectedTopic={selectedTopic}
+          onHideBrowseTopics={onHideBrowseTopics}
+        />
       )}
     </aside>
   );

@@ -12,6 +12,8 @@ type User = {
   firstname: string;
   lastname: string;
   dob: string;
+  convo_llm_mode?: string;
+  user_summary?: string;
 };
 
 type AuthContextType = {

@@ -1,21 +1,24 @@
 import json, asyncio, logging
-from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer  # type: ignore
 import time
-from vosk import Model, KaldiRecognizer
-from django.contrib.auth import get_user_model
-from channels.db import database_sync_to_async
-from groq import AsyncGroq
-from dotenv import load_dotenv
+from vosk import Model, KaldiRecognizer  # type: ignore
+from django.contrib.auth import get_user_model  # type: ignore
+from channels.db import database_sync_to_async  # type: ignore
+import groq  # type: ignore
+import instructor  # type: ignore
+from pydantic import BaseModel  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 import os
 from pathlib import Path
-from elevenlabs import stream
-from elevenlabs.client import ElevenLabs
+from elevenlabs import stream  # type: ignore
+from elevenlabs.client import ElevenLabs  # type: ignore
 import random
 from concurrent.futures import ThreadPoolExecutor
-import datetime
-from datetime import date
+from datetime import datetime, date
 from .assembly_stt import AssemblySTT
-from django.core.cache import cache
+from .responsePrompts import *
+from django.core.cache import cache  # type: ignore
+from typing import List
 
 executor = ThreadPoolExecutor(max_workers=2)  # Put globally
 
@@ -36,14 +39,14 @@ logger = logging.getLogger(__name__)
 # Let's use 3200 samples = 200ms to be safe
 CHUNK_SAMPLES = 3200  # 200ms of audio at 16kHz
 SILENCE_THRESHOLD = 0.5  # seconds of silence before processing
-STREAM_TIMEOUT = 5  # seconds of silence before ending stream
-FIRST_TIMEOUT = 5
-SECOND_TIMEOUT = 5
-MAX_CALL_DURATION_TIME = 180
+STREAM_TIMEOUT = 2  # seconds of silence before ending stream
+FIRST_TIMEOUT = 4
+SECOND_TIMEOUT = 1
+MAX_CALL_DURATION_TIME = 120
 
 
 # Initialize Vosk model
-model_path = "convos/vosk-model-en-us-0.15"  # Path relative to backend directory
+model_path = "bondcastConvos/vosk-model-en-us-0.15"  # Path relative to backend directory
 vosk_stt_model = Model(model_path)
 
 # Initialize ElevenLabs client
@@ -53,32 +56,37 @@ if not api_key:
 elevenlabs = ElevenLabs(api_key=api_key)
 
  # Initialize Groq client with API key from .env
-groq_client = AsyncGroq(api_key=os.getenv('GROQ_API_KEY'))
+groq_client = groq.Groq(api_key=os.getenv('GROQ_API_KEY'))
+
+# Initialize instructor client for structured responses
+groq_instructor_client = instructor.patch(groq.Groq(api_key=os.getenv('GROQ_API_KEY')))
 
 User = get_user_model()
 
 class SpeechConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # Get username and llmMode from URL
+        # Get username and Chat.tsx variant from URL
         self.username = self.scope['url_route']['kwargs']['username']
-        self.llmMode = self.scope['url_route']['kwargs']['llmMode']
+        self.variant = self.scope['url_route']['kwargs']['variant']
         
         self.justCalled = True
-        self.ready_for_streaming = False  # Add this flag
+        self.ready_for_streaming = True  # Add this flag
         
         # Get user from database
-        user = await self.get_user_by_username(self.username)
+        user = await self.get_user_by_username(self.username)  # type: ignore
         if not user:
             logger.warning(f"User not found: {self.username}")
             await self.close(code=4001)
             return
         
         await self.accept()
-            
+
+        self.is_recording = False            
         self.user_id = user.id
         self.firstname = user.firstname
-        # logger.info(f"Connected user {self.firstname} with llmMode: {self.llmMode}")
-
+        self.user_summary = user.user_summary
+        
+        logger.info(f"Connected user {self.firstname} with variant: {self.variant}")
         self.start_call_time = time.time()
         self.last_baseline_audio_time = time.time()
         self.buf = bytearray()
@@ -93,6 +101,8 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.passed_second_timeout = False
         self.bondi_llm_triggered = False
         self.user_age = (date.today().year - user.dob.year) - ((date.today().month, date.today().day) < (user.dob.month, user.dob.day))
+        self.current_day = datetime.now().strftime("%A, %B %d")
+        self.convo_llm_mode = "general"
 
         # Initialize Vosk recognizer for partial transcription
         self.vosk_stt_recognizer = KaldiRecognizer(vosk_stt_model, 16000)
@@ -108,12 +118,13 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         self.tts_stream_task = None
 
         # Get greeting and contextual history from cache
-        cache_key = f'user_{self.user_id}_greeting'
-        context_key = f'user_{self.user_id}_context'
-        self.bondi_greeting = cache.get(cache_key) or "Hello, how are you doing today?"
-        self.conversation_context = cache.get(context_key) or ""
+        intro_cache_key = f'user_{self.user_id}_intro'
+        bondcast_context_key = f'user_{self.user_id}_context'
 
-        logger.info(f"Contextual History: {self.conversation_context}")
+        self.bondi_greeting = cache.get(intro_cache_key)
+        self.conversation_context = cache.get(bondcast_context_key) or ""
+
+        # logger.info(f"Contextual History: {self.conversation_context}")
 
         # Don't start greeting immediately - wait for ready signal
         self.bondi_llm_triggered = True
@@ -127,10 +138,16 @@ class SpeechConsumer(AsyncWebsocketConsumer):
         except User.DoesNotExist:
             return None
 
+    @database_sync_to_async
+    def check_user_has_friends(self, user):
+        """Check if user has at least one friend"""
+        from friends.models import Friendship
+        return Friendship.objects.filter(user_a=user).exists() or Friendship.objects.filter(user_b=user).exists()
+
     def _transcribe(self, transcript):
         """Callback for handling transcripts from AssemblyAI"""
         if transcript == "__START_TRANSCRIPTION__":
-            logger.info(f"ASSEMBLY TRIGGERED TRANSCRIPTION")
+            # logger.info(f"ASSEMBLY TRIGGERED TRANSCRIPTION")
             self.transcribing_text = True
             self.streaming_text = False
             return
@@ -150,7 +167,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             if self.current_user_input: self.current_user_input += " " + transcript
             else: self.current_user_input = transcript
 
-            logger.info(f"TRANSCRIPTION: {transcript}")
+            # logger.info(f"TRANSCRIPTION: {transcript}")
             self.transcribing_text = False
             self.streaming_text = False
             self.last_baseline_audio_time = time.time()
@@ -173,14 +190,14 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 break
 
             # Normal silence threshold check
-            if not self.bondi_llm_triggered and self.llmMode == "user_called" and user_audio_delay >= SILENCE_THRESHOLD and self.current_user_input and not self.transcribing_text:
+            if not self.bondi_llm_triggered and user_audio_delay >= SILENCE_THRESHOLD and self.current_user_input and not self.transcribing_text:
                 self.bondi_llm_triggered = True
-                self.tts_llm_task = asyncio.create_task(self._process_tts_llm("normal"))
+                self.tts_llm_task = asyncio.create_task(self._process_tts_llm())
 
             # First timeout check
             if not self.streaming_text and not self.bondi_llm_triggered and not self.passed_first_timeout and not self.call_is_ending and user_audio_delay >= FIRST_TIMEOUT and not self.current_user_input:
                 logger.info("first timeout request made")
-                first_timeout_response = "Can you still hear me?"
+                first_timeout_response = "Are you still there?"
                 self.passed_first_timeout = True
                 await self._stream_tts(first_timeout_response)
                 # Wait for streaming to complete before continuing
@@ -191,19 +208,19 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             # Second timeout check
             if self.passed_first_timeout and not self.passed_second_timeout and not self.call_is_ending and user_audio_delay >= SECOND_TIMEOUT and not self.current_user_input:
                 logger.info("second timeout request made")
-                second_timeout_response = "Hello? Are you still there?"
                 self.passed_second_timeout = True
-                await self._stream_tts(second_timeout_response)
-                # Wait for streaming to complete before continuing
-                while self.streaming_text:
-                    await asyncio.sleep(0.1)
-                continue  # Skip to next iteration to recheck conditions
+                # second_timeout_response = "Hello? Are you still there?"
+                # await self._stream_tts(second_timeout_response)
+                # # Wait for streaming to complete before continuing
+                # while self.streaming_text:
+                #     await asyncio.sleep(0.1)
+                # continue  # Skip to next iteration to recheck conditions
 
             # Final timeout check
             if self.passed_first_timeout and self.passed_second_timeout and not self.call_is_ending and user_audio_delay >= STREAM_TIMEOUT and not self.current_user_input:
                 self.call_is_ending = True  # Set this before streaming to prevent race conditions
                 self.streaming_text = True
-                timeout_response = "Let's talk later. Goodbye."
+                timeout_response = "Let's do this Bond Cast later."
                 await self._stream_tts(timeout_response)
                 # Wait for streaming to complete before closing
                 while self.streaming_text:
@@ -219,10 +236,15 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 data = json.loads(text_data)
                 if data.get("type") == "ready_for_streaming":
                     self.ready_for_streaming = True
+
+                    if self.variant == "default":
+                        # Send start recording signal to frontend
+                        await self.send(text_data=json.dumps({"type": "start_recording"}))
+                        logger.info("Sent start_recording signal to frontend")
                     # Now start the greeting
                     await self._stream_tts(self.bondi_greeting)
                 elif data.get("type") == "audio_started":
-                    logger.info("Frontend started playing audio")
+                    # logger.info("Frontend started playing audio")
                     self.streaming_text = True
                 elif data.get("type") == "audio_done":
                     self.streaming_text = False
@@ -233,12 +255,12 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                     self.agent_last_response = self.incoming_tts
                     self.conversation_history += "Bondi: " + f"\"{self.agent_last_response}\" "
                     self.buf.clear()  # Just clear the buffer, no need to send to AssemblyAI
-                    logger.info("Frontend finished playing audio")
+                    # logger.info("Frontend finished playing audio")
                     # Close connection if this was the final timeout message
                     if self.call_is_ending:
                         await self.close(code=1000)  # Normal closure
                 elif data.get("type") == "audio_cleanup":
-                    logger.info("Frontend audio cleanup complete")
+                    # logger.info("Frontend audio cleanup complete")
                     self.streaming_text = False
                     self.bondi_llm_triggered = False
                 return
@@ -264,7 +286,7 @@ class SpeechConsumer(AsyncWebsocketConsumer):
             partial_result = json.loads(self.vosk_stt_recognizer.PartialResult())
 
             if partial_result.get("partial"):
-                logger.info(f"Vosk Partial Triggered!")
+                # logger.info(f"Vosk Partial Triggered!")
                 self.last_baseline_audio_time = time.time()
                 self.justCalled = False
                 self.passed_first_timeout = False
@@ -290,114 +312,99 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 
                 self.vosk_stt_recognizer.Reset()  # Clear the recognizer's internal state
 
-    async def _process_tts_llm(self, response_type: str) -> None:
+    async def _process_tts_llm(self) -> None:
         try:
             self.bondi_llm_triggered = True
             call_duration = time.time() - self.start_call_time
-            llm_tts_system_context = ""
-            llm_tts_input = ""
 
             logger.info(f"Entered TTS LLM Processing")
             logger.info(f"Call Duration: {call_duration}")
+            logger.info(f"Agent Last Response: {self.agent_last_response}")
+            logger.info(f"Current User Input: {self.current_user_input}")
 
-            exit_phrases = [
-                "goodbye",
-                "talk to you later",
-                "i have to leave right now",
-                "i have to go right now",
-               
-            ]
+            llm_tts_system_context = f"""You are Bondi, a fun, casual AI podcast co-host for Bondiver. 
+                You're in the middle of a 1-minute BondCast voice conversation with a user named {self.firstname}. 
+                If the call duration is nearing 1 minute, you should wrap up the convo and prepare your last message,
+                Your job is to keep the convo light, entertaining, and podcast-like. 
+                Speak naturally, as if you're chatting in a voice memo.
 
-            if (response_type == "normal" and call_duration >= 60):
-                logger.info(f"Went Past a Minute")
-                llm_tts_system_context = (
-                    f"You are Bondi, an AI voice companion on a short, friendly call with {self.firstname}, who is {self.user_age} years old.\n"
-                    f"The current call duration is {call_duration} seconds — it's time to wrap up.\n\n"
-                    f"Your goal now is to end the call naturally and politely, as if you're wrapping up a real human conversation.\n"
-                    f"Do not ask {self.firstname} any more questions. Just make a warm closing remark.\n"
-                    f"If {self.firstname} says anything like \"I have to go\", \"I should get going\", or shows signs of wanting to leave, immediately move to end the call.\n\n"
-                    f"Make sure your final message includes this exact line:\n"
-                    f"\"I will talk to you later\"\n"
-                    f"This is how you signal that the conversation is over.\n\n"
-                    f"Conversation so far:\n{self.conversation_history.strip()}\n\n"
-                    f"Context you know about {self.firstname}:\n{self.conversation_context.strip()}"
-                )
+                Here's the conversation history so far:
+                {self.conversation_history}
 
-                llm_tts_input = (
-                    f"{self.firstname} just said: \"{self.current_user_input}\"\n"
-                    f"The last thing you (Bondi) said was: \"{self.agent_last_response}\"\n"
-                    f"Call duration so far: {call_duration} seconds\n\n"
-                    "Now is the time to end the conversation.\n"
-                    f"Do not ask {self.firstname} anything else. Just deliver a short, friendly closing line.\n"
-                    f"Make sure to include this exact phrase in your final message:\n"
-                    "\"I will talk to you later\""
+                Respond to {self.firstname} in a warm and expressive voice line. 
+                Make sure to include a fun entertaining thoughtful
+                follow-up question that would be entertaining for a podcast at the end of your response 
+                unless you're ending the call.
+
+                If {self.firstname} seems like they want to stop talking or if 
+                the call is nearing 1 minute, that is also a signal to end the call.
+
+                Return a JSON object with:
+                - bondi_response: your message
+                - end_call: true if this is the final message of the BondCast, false otherwise
+            """
+
+            llm_tts_input = f"""{self.firstname} just said: {self.current_user_input}
+                Your last message was: {self.agent_last_response}
+
+                Call duration so far: {time.time() - self.start_call_time:.2f} seconds
+
+                Decide whether to keep the convo going or wrap it up based on tone and time. 
+                Keep it entertaining, interesting, casual, and voice-message styled.
+
+                Return a JSON object with:
+                - bondi_response: your message
+                - end_call: true if this is the final message of the BondCast, false otherwise
+            """
+
+            class BondiResponse(BaseModel):
+                bondi_response: str
+                end_call: bool
+
+            # Get groq response with proper exception handling
+            try:
+                response = groq_instructor_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",  
+                    response_model=BondiResponse,
+                    messages=[
+                        {"role": "system", "content": llm_tts_system_context},
+                        {"role": "user", "content": llm_tts_input}
+                    ],
+                    stream=False,  
+                    temperature=0.9,
+                    max_completion_tokens=300,
                 )
                 
-            else:
-                llm_tts_system_context = (
-                    f"You are Bondi, an AI voice companion on a brief, casual call with {self.firstname}, who is {self.user_age} years old.\n"
-                    "This call is meant to be quick. Your mission is to end the call within one minute, ideally sooner.\n"
-                    f"The current call duration is {call_duration} seconds.\n\n"
+                # Extract the structured response content
+                llm_response = response.bondi_response
+                end_call = response.end_call
 
-                    f"Your top priority is to respect {self.firstname}'s time. Do not drag the conversation.\n"
-                    f"If {self.firstname} shows *any* sign of winding down — like saying they’re tired, getting ready for bed, or speaking vaguely — skip all remaining phases and start ending the call immediately.\n"
-                    f"You should be looking for *any excuse* to end the call early. Do not force conversation.\n\n"
+                logger.info(f"Bondi Response: {llm_response}")
+                logger.info(f"End Call Boolean: {end_call}")
 
-                    "The conversation has 3 loose phases, but they're optional if the energy drops:\n"
-                    f"1. Ask how {self.firstname}'s day has been or what {self.firstname} has been up to.\n"
-                    f"2. Ask about what {self.firstname} is doing next or {self.firstname}'s plans for the rest of the day.\n"
-                    f"3. Wrap up with a warm, short goodbye.\n\n"
-
-                    "Rules:\n"
-                    "- Keep replies to 1–2 short, casual sentences. Nothing more.\n"
-                    f"- In phases 1 and 2, end with a follow-up question *only* if {self.firstname} seems interested. Otherwise, skip ahead.\n"
-                    f"- If {self.firstname} sounds vague, tired, or even mildly disinterested, skip straight to ending.\n"
-                    "- Do NOT wait to be told to end — take initiative.\n\n"
-
-                    "When you end the call, include this exact sentence somewhere in your final message:\n"
-                    '"I will talk to you later"\n\n'
-
-                    f"Avoid repeating what {self.firstname} says, never talk about yourself, and absolutely do not say 'Haha'. Keep things light, fast, and human.\n\n"
-
-                    f"Conversation so far:\n{self.conversation_history.strip()}\n\n"
-                    f"Context you know about {self.firstname}:\n{self.conversation_context.strip()}"
-                )
-
-                llm_tts_input = (
-                    f"{self.firstname} just said: \"{self.current_user_input}\"\n"
-                    f"The last thing you (Bondi) said was: \"{self.agent_last_response}\"\n"
-                    f"Call duration so far: {call_duration} seconds\n\n"
-                    "Reply with 1–2 short, natural-sounding sentences.\n"
-                    f"If you're in phase 1 or 2, end with a friendly follow-up question for {self.firstname}, but only if {self.firstname} seems clearly engaged.\n"
-                    f"If you're in phase 3, or if {self.firstname} sounds vague, tired, low-energy, or uninterested, begin ending the call immediately.\n"
-                    f"When you're ready to end the call, include this exact sentence somewhere in your reply:\n"
-                    '"I will talk to you later"'
-                )
-
-            # Get groq response
-            groq_response = await groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",  
-                messages=[
-                    {"role": "system", "content": llm_tts_system_context},
-                    {"role": "user", "content": llm_tts_input}
-                ],
-                stream=False,  
-                temperature=0.9,
-                max_completion_tokens=150,
-            )
-            # Extract the full response content
-            llm_response = groq_response.choices[0].message.content.strip()
+            except Exception as e:
+                logger.error(f"Error calling Groq API: {str(e)}")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Full error details: {repr(e)}")
+                
+                # Fallback response
+                llm_response = "I'm having trouble processing that right now."
+                end_call = True
 
             if self.transcribing_text:
                 self.bondi_llm_triggered = False
-                logger.info(f"Bondi Silence: LLM TTS Response Getting Rejected bc transcribing_text is True")
+                # logger.info(f"Bondi Silence: LLM TTS Response Getting Rejected bc transcribing_text is True")
                 return
-            elif "talk to you later" in llm_response.lower():
-                logger.info(f"LLM TTS Convo ending with following response: {llm_response}")
-                logger.info(f"Call Duration Time: {time.time() - self.start_call_time}")
-                self.call_is_ending = True
+
+            elif end_call:
+                logger.info(f"Last Response: {llm_response}")
+                self.call_is_ending = True  # Set this before streaming to prevent race conditions
                 self.streaming_text = True
                 await self._stream_tts(llm_response)
+                # Wait for streaming to complete before closing
+                while self.streaming_text:
+                    await asyncio.sleep(0.1)
+                await self.close(code=1000)  # Normal closure
                 return
             else:
                 logger.info(f"LLM TTS Response Getting Accepted with following response: {llm_response}")
@@ -412,12 +419,12 @@ class SpeechConsumer(AsyncWebsocketConsumer):
     async def _stream_tts(self, tts_text):
         try:
             self.incoming_tts = tts_text
-            logger.info(f"Entered TTS streaming mode")
+            # logger.info(f"Entered TTS streaming mode")
 
             def stream_chunks_sync():
                 return list(elevenlabs.text_to_speech.stream(
                     text=tts_text,
-                    voice_id="4NejU5DwQjevnR6mh3mb",
+                    voice_id=os.getenv('ELEVENLABS_VOICE_ID'),
                     model_id="eleven_flash_v2",
                     output_format="pcm_16000"
                 ))
@@ -430,18 +437,25 @@ class SpeechConsumer(AsyncWebsocketConsumer):
                 await self.send(bytes_data=chunk)
 
             self.last_baseline_audio_time = time.time()
-            logger.info("ElevenLabs Speech Ended; Last Audio Set!")
+            # logger.info("ElevenLabs Speech Ended; Last Audio Set!")
 
         except asyncio.CancelledError:
             self.bondi_llm_triggered = False
-            logger.info("TTS streaming was cancelled mid-flight")
-            # Tel frontend to stop playing audio
+            # logger.info("TTS streaming was cancelled mid-flight")
+            # Tell frontend to stop playing audio and recording
             await self.send(text_data=json.dumps({"type": "stop_audio"}))
             self.streaming_text = False
             return
 
 
     async def disconnect(self, code):
+        # Ensure recording is stopped when disconnecting (only in general mode)
+        if self.variant == "default":
+            try:
+                await self.send(text_data=json.dumps({"type": "stop_recording"}))
+            except:
+                pass  # Connection might already be closed
+        
         await self._flush()
         if self.silence_task and not self.silence_task.done():
             self.silence_task.cancel()

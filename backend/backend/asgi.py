@@ -8,26 +8,27 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 """
 
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 from pathlib import Path
 
 # ✅ Load environment variables from .env
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-import django
-from channels.routing import ProtocolTypeRouter, URLRouter
-from django.core.asgi import get_asgi_application
+import django  # type: ignore
+from channels.routing import ProtocolTypeRouter, URLRouter  # type: ignore
+from django.core.asgi import get_asgi_application  # type: ignore
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
 django.setup()
 
 # Import these after django.setup()
-from convos.routing import websocket_urlpatterns as convos_websocket_urlpatterns
+from bondcastConvos.routing import websocket_urlpatterns as bondcast_websocket_urlpatterns
 from friends.routing import websocket_urlpatterns as friends_websocket_urlpatterns
+from bondcastRequests.routing import websocket_urlpatterns as bondcast_requests_websocket_urlpatterns
 
 # Combine all websocket URL patterns
-websocket_urlpatterns = convos_websocket_urlpatterns + friends_websocket_urlpatterns
+websocket_urlpatterns = bondcast_websocket_urlpatterns + friends_websocket_urlpatterns + bondcast_requests_websocket_urlpatterns
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),

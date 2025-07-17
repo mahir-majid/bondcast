@@ -5,11 +5,12 @@ import { setupAudioProcessor } from "./audio";
 import { useAuth } from "./AuthContext";
 
 interface ChatProps {
-  llmMode: string;
   onRecordingComplete?: (url: string) => void;
+  variant?: 'default' | 'firstTime';
+  disabled?: boolean;
 }
 
-export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
+export default function Chat({ onRecordingComplete, variant = 'default', disabled = false }: ChatProps) {
   const { user } = useAuth();
   const [isTalking, setIsTalking] = useState(false);
   const [isRinging, setIsRinging] = useState(false);
@@ -112,8 +113,8 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
 
       // Don't start recording yet - we'll start it when ElevenLabs begins speaking
       
-      // WebSocket connection with username
-      const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}/ws/speech/${user.username}/${llmMode}/`);
+      // WebSocket connection with username and variant
+      const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}/ws/speech/${user.username}/${variant}/`);
       socket.binaryType = "arraybuffer";
 
       // Handles initial connection to the websocket
@@ -172,11 +173,6 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
             // Create copies of the buffer before any transfers
             const bufferCopy = e.data.slice(0);
             
-            // Start recording when we receive the first audio chunk from ElevenLabs
-            if (!mediaRecorderRef.current?.state || mediaRecorderRef.current.state === 'inactive') {
-              mediaRecorderRef.current?.start();
-            }
-            
             // Send the PCM data to the worklet
             if (workletNodeTTSRef.current) {
               workletNodeTTSRef.current.port.postMessage({
@@ -205,6 +201,20 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
               }
               if (recordingTTSNodeRef.current) {
                 recordingTTSNodeRef.current.port.postMessage({ type: 'stop_audio' });
+              }
+            } else if (data.type === 'start_recording') {
+              console.log("Received start_recording from backend");
+              // Start recording when backend signals to start
+              if (!mediaRecorderRef.current?.state || mediaRecorderRef.current.state === 'inactive') {
+                mediaRecorderRef.current?.start();
+                console.log("Started recording");
+              }
+            } else if (data.type === 'stop_recording') {
+              console.log("Received stop_recording from backend");
+              // Stop recording when backend signals to stop
+              if (mediaRecorderRef.current?.state === 'recording') {
+                mediaRecorderRef.current?.stop();
+                console.log("Stopped recording");
               }
             }
           }
@@ -287,7 +297,7 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
 
   // Toggler between starting daily chat and ending it
   const handleClick = () => {
-    if (isRinging) return; // Do nothing if ringing
+    if (disabled || isRinging) return; // Do nothing if disabled or ringing
     if (isTalking && stopRef.current) stopRef.current();
     else TalkToAI();
   };
@@ -296,11 +306,16 @@ export default function Chat({ llmMode, onRecordingComplete }: ChatProps) {
     <div className="flex flex-col items-center gap-6 w-full max-w-2xl">
       <button
         onClick={handleClick}
-        className={`px-6 py-3 cursor-pointer rounded-lg bg-gradient-to-r from-purple-700 to-purple-900 text-amber-300 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(251,191,36,0.8)] hover:from-purple-600 hover:to-purple-800 hover:text-amber-200 active:scale-95 active:shadow-inner transition-all duration-200 ${
-          isRinging ? 'opacity-75 cursor-not-allowed' : ''
-        }`}
+        className={`
+          ${variant === 'firstTime' 
+            ? 'w-full py-4 px-8 rounded-2xl font-bold text-lg bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 text-white shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300'
+            : 'px-6 py-3 rounded-lg bg-gradient-to-r from-purple-700 to-purple-900 text-amber-300 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(251,191,36,0.8)] hover:from-purple-600 hover:to-purple-800 hover:text-amber-200 active:scale-95 active:shadow-inner transition-all duration-200'
+          }
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${isRinging ? 'opacity-75 cursor-not-allowed' : ''}
+        `}
       >
-        {isRinging ? "Ringing..." : isTalking ? "End Call" : "Call Bondi"}
+        {isRinging ? "Ringing..." : isTalking ? "End Call" : disabled ? "Start Recording" : "Start Recording"}
       </button>
     </div>
   );

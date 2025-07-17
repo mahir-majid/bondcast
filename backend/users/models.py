@@ -1,5 +1,6 @@
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
-from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin  # type: ignore
+from django.db import models  # type: ignore
+from aiMessages.aiDmPrompts import llmModeState
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -31,6 +32,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         symmetrical=False,             # *we* maintain symmetry in Friendship
         related_name="+"               # Django won't create reverse ‘friends_set’
     )
+
+    # Conversation settings
+    convo_llm_mode = models.CharField(max_length=20, default=llmModeState.fteIntro.value)
+    user_summary = models.TextField(default="")
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

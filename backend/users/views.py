@@ -1,18 +1,18 @@
-from rest_framework import generics, status
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework import generics, status  # type: ignore
+from rest_framework.views import APIView  # type: ignore
+from rest_framework.permissions import AllowAny, IsAuthenticated  # type: ignore
+from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
 from .serializers import UserSerializer
-from rest_framework.response import Response
+from rest_framework.response import Response  # type: ignore
 from .models import CustomUser
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
+from django.contrib.auth import get_user_model  # type: ignore
+from rest_framework_simplejwt.views import TokenRefreshView  # type: ignore
 import os
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid import SendGridAPIClient  # type: ignore
+from sendgrid.helpers.mail import Mail  # type: ignore
 import random
-from django.core.cache import cache
+from django.core.cache import cache  # type: ignore
 
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 SENDGRID_JOIN_TEMPLATE_ID = os.getenv('SENDGRID_JOIN_TEMPLATE_ID')
@@ -100,6 +100,8 @@ class LoginOrRegisterJWTView(APIView):
                     "firstname": user.firstname,
                     "lastname": user.lastname,
                     "dob": user.dob,
+                    "convo_llm_mode": user.convo_llm_mode,
+                    "user_summary": user.user_summary,
                 },
             }
         )
@@ -118,6 +120,8 @@ class VerifyUserJWT(APIView):
             "firstname": user.firstname,
             "lastname": user.lastname,
             "dob": user.dob,
+            "convo_llm_mode": user.convo_llm_mode,
+            "user_summary": user.user_summary,
         })
 
 # Upon logging out, getting rid of user's JWTs

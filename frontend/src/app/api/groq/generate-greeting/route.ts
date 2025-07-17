@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const timeContext = await request.json();
 
     // Send the time context to the backend
-    const backendUrl = `${process.env.NEXT_PUBLIC_URL}/api/convos/generate-greeting/`;
+    const backendUrl = `${process.env.NEXT_PUBLIC_URL}/api/bondcast-convos/generate-greeting/`;
     
     const response = await fetch(backendUrl, {
       method: 'POST',

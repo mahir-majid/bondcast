@@ -1,10 +1,10 @@
-import websocket
+import websocket  # type: ignore
 import json
 import threading
 import time
 from urllib.parse import urlencode
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 from pathlib import Path
 
 # Load environment variables
